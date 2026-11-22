@@ -1,14 +1,24 @@
 import { defineConfig } from 'vite'
 import preact from '@preact/preset-vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { execSync } from 'node:child_process'
 import pkg from './package.json' with { type: 'json' }
+
+// Version: 1.0.N, where N goes up by one with every commit after 1.0 (so every update shows a new number).
+function version(): string {
+  const [major, minor] = pkg.version.split('.')
+  try {
+    const count = Number(execSync('git rev-list --count HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim())
+    return `${major}.${minor}.${Math.max(0, count - pkg.buildBase)}`
+  } catch { return pkg.version }
+}
 
 // GitHub Pages serves the app under the repository name (case matters).
 const BASE = '/Travel-Sidekick/'
 
 export default defineConfig({
   base: BASE,
-  define: { __VERSION__: JSON.stringify(pkg.version) },
+  define: { __VERSION__: JSON.stringify(version()) },
   plugins: [
     preact(),
     VitePWA({

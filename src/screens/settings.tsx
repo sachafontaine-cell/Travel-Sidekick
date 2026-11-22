@@ -5,7 +5,7 @@ import { Icon, Sheet, Spinner } from '../ui'
 import { settings, trips } from '../lib/data'
 import { flashModels, AiError } from '../lib/gemini'
 import { connected, familyKey, setAlerts, setKayak, shareKey, syncNow, syncState } from '../lib/sync'
-import { applyUpdate, checkForUpdate } from '../lib/update'
+import { updateNow } from '../lib/update'
 import { DEMO } from '../lib/store'
 
 const AI_STUDIO = 'https://aistudio.google.com/apikey'
@@ -139,11 +139,11 @@ function Alerts() {
 }
 
 function Version() {
-  const [state, setState] = useState<'idle' | 'checking' | 'ready' | 'latest'>('idle')
+  const [state, setState] = useState<'idle' | 'checking' | 'latest'>('idle')
   useEffect(() => { if (state === 'latest') { const t = setTimeout(() => setState('idle'), 3000); return () => clearTimeout(t) } }, [state])
   return (
-    <button class="ver press" onClick={async () => { if (state === 'ready') return applyUpdate(); setState('checking'); setState((await checkForUpdate()) ? 'ready' : 'latest') }}>
-      v{__VERSION__} {state === 'checking' ? <Spinner /> : <Icon.refresh />}{state === 'ready' ? 'Update ready: tap to reload' : state === 'latest' ? 'Up to date' : ''}
+    <button class="ver press" disabled={state === 'checking'} onClick={async () => { setState('checking'); if ((await updateNow()) === 'latest') setState('latest') }}>
+      v{__VERSION__} {state === 'checking' ? <Spinner /> : <Icon.refresh />}{state === 'checking' ? 'Checking… (reloads if there\'s a new version)' : state === 'latest' ? 'Up to date' : ''}
     </button>
   )
 }

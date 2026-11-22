@@ -1,7 +1,7 @@
 // Updates without restarting the phone. An installed web app stays in memory, so it never
 // reloads on its own. Here: check for a new version whenever the app is opened (and every
 // 30 min while open). When one is ready, it's applied the moment you leave the home screen
-// of the app (invisible to you), or right away if you tap "Reload".
+// of the app (invisible to you), or right away when you tap the version in ⚙ (one tap).
 type Listener = () => void
 let ready = false
 let isHome = () => true
@@ -18,6 +18,23 @@ export async function checkForUpdate(): Promise<boolean> {
     await reg?.update()
     return !!(reg?.installing || reg?.waiting) || ready
   } catch { return ready }
+}
+
+/**
+ * The version button: one tap checks, and if there's a new version it's installed and the app
+ * reloads into it by itself. Resolves 'latest' when there's nothing new.
+ */
+export async function updateNow(): Promise<'latest' | 'reloading'> {
+  if (ready) { applyUpdate(); return 'reloading' }
+  if (!(await checkForUpdate())) return 'latest'
+  // The new version activates on its own (autoUpdate); wait for it, then reload. 20 s at most.
+  await new Promise<void>((done) => {
+    const t = setTimeout(done, 20000)
+    navigator.serviceWorker.addEventListener('controllerchange', () => { clearTimeout(t); done() }, { once: true })
+    if (ready) { clearTimeout(t); done() }
+  })
+  applyUpdate()
+  return 'reloading'
 }
 
 export function startUpdates() {

@@ -66,6 +66,34 @@ Goal on the Pixel 7: opens in under 1 s, every tap answers in under 0.1 s, scree
 2. Smart: list building + scores, Ask, What now?, rain plan B, bookings from email, leave-by, hours check, emails.
 3. Snap (translate photos, bill check), Prep, Ghost guide.
 
+## 5b. No manual script updates (proposal)
+1. **Thin script.** Almost all logic lives in the app, which updates itself. The script only does sync, Gmail search, timers and emails. Prompts and rules are stored as data in the Sheet, so changing them needs no script update.
+2. **Self-updating script.** The script's code lives in `script/` in this repo (no family data, keys only in Script Properties). The script pulls new code from `main` and redeploys itself at the same address, using the Apps Script API. It runs nightly, and the app asks for it when it needs a newer script version. If a new Google permission is ever needed, the script emails a one-link approval.
+3. **Fallback:** a GitHub Action deploys with `clasp`. Needs a one-time login on a computer and a token stored as a GitHub secret (broader access), so second choice.
+
+One-time setup (~15 min, computer, click-by-click steps in the README): Google Cloud project (also used for the hours check), turn on the Apps Script API and Places API, paste a short starter script, approve, deploy. Self-update is tested first thing in Phase 1; if Google blocks it, use the fallback.
+
+## 5c. Lessons from Chef Luc, Wardrobe COO and the Control Center
+**Gemini key (easy, one paste for both phones)**
+- All Fontaine apps share one web address, so if this phone already has Chef Luc's or Wardrobe COO's key: one tap, "Use the key from Chef Luc".
+- Otherwise Chef Luc's flow: **Get a key** (opens AI Studio) → Create API key → **Paste key**; checked in ~1 s without spending a request.
+- The app hands the key to the script once; the other parent's phone picks it up on its next sync. Same for the Maps key. Never in backups or the repo.
+
+**Gemini on the free tier**
+- Switch models when one is busy and remember the one that works.
+- Stream replies, catch stalls, low thinking, clear timeouts, a visible Retry.
+- Small photo uploads; a snap is saved at once and read in the background.
+
+**App**
+- Reuse the Control Center family link: phones that already have it need nothing new.
+- Ask once "Sacha or Imose?" so changes show who made them.
+- Updates without restarting: check on open and every 30 min, apply when you leave; version + ↻ at the bottom; safety-net reset if stuck.
+- Never redraw a text box while someone types.
+- Changes go out in the background with Retry, and never twice (Cozi lesson).
+- Typed text survives closing the app.
+- Full-bleed navy/gold icon, installable, "Add to home screen" card.
+- End-to-end tests (phone sizes, light/dark, offline, fake script) + screenshots, one version number everywhere, "Where to change what" table in the README.
+
 ## 6. Fontaine scheme
 | Token | Light | Dark |
 |---|---|---|

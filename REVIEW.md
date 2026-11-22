@@ -11,9 +11,18 @@ Mockups in `mockups/` use sample names; the live canvas has the real ones.
 - **Day shape:** start and end with −/+ (15 min), suggestion in parentheses, "Custom" tag. Booked tickets keep their time.
 - **Downtime:** not a set time. Setup holds on/off + length; each day fits it in like an activity (after lunch when it can); drag it in Days.
 - **Activity Card:** a dialog. Closes with X or a tap outside.
-- **Must-sees hours:** the Google script checks every must-see against Google's place data each morning (7:00). The Card shows "Open today … · checked with Google" + **Check hours ↗** (Google Maps). Must-sees shows when it last checked. Email if a must-see is closed on its planned day.
+- **Must-sees hours:** the Google script checks every must-see each morning (7:00) with Gemini + Google Search (free). The Card shows "Open today … · checked with Google" + **Check hours ↗** (Google Maps). Must-sees shows when it last checked. Email if a must-see is closed on its planned day.
 - **"Almost sold out"** dropped (no data source) → "timed tickets: book ahead".
 - **Translator:** no built-in one. Trip tab has a **Google Translate ↗** link. Prep has **Before you go: download French in Google Translate** (checkbox + link), and the script emails a reminder 3 days before the trip.
+
+## 1c. Decisions (Nov 22, later)
+- **No paid Google services, no card.** Gemini stays on the free tier: its project never gets billing (a project with billing loses the free tier). The hours check uses Gemini with Google Search (free daily allowance) instead of the paid Places service; OpenStreetMap hours as backup. Walking times use the Google script's built-in Maps (free). Self-update needs a Cloud project but no billing.
+- **Own Gemini key**, in its own new project ("Travel Sidekick" in AI Studio). Free limits are per project, so sharing Chef Luc's would split one allowance across three apps. Chef Luc's key stays as a one-tap fallback.
+- **GitHub two-step login:** yes.
+- **Steps:** no reliable way from a web app (see chat). Pace = today's planned walking + where you are when the app is open + one-tap Tired / OK / Fresh.
+- **OK:** + Add on List; first-run "Building your list" screen; Setup sections shrink to summaries after the first time; prices "€27 pp ($29)"; day tabs scroll for long trips.
+- **Vibes:** pick as many as you like; each gets its own % with −/+ (10% steps). Total is always 100%: + takes from the biggest share. Suggestion in parentheses, "Custom" tag.
+- **Must-sees:** the AI proposes them on the first-run screen (untick any, + add one). Later: the star on the place's Card (the one place). Must-sees can't be eliminated, only pushed down.
 
 ## 1b. Engineering review: app + script (Nov 22)
 **App**
@@ -35,7 +44,7 @@ Mockups in `mockups/` use sample names; the live canvas has the real ones.
 12. **Booking emails are cleaned before Gemini sees them:** passport and card numbers are removed (Gemini's free tier may be used by Google).
 13. **Only Sacha's inbox is read.** Bookings in Imose's inbox: forward them, or use the KAYAK calendar link.
 14. **Emails are never sent twice** (each alert has an ID).
-15. **Keys are locked down:** Gemini key limited to Gemini; Google Maps key limited to Places with a daily cap and a $1 budget alert, so it can't run up a bill.
+15. **Keys are locked down:** Gemini key limited to Gemini, in a project with no billing, so it can never cost anything.
 16. **Self-update trust:** whoever can push to this repo controls the script, so GitHub needs two-step login. The script only takes code from `main`.
 17. **App and script know each other's version**; a mismatch triggers the self-update.
 
@@ -86,7 +95,7 @@ Goal on the Pixel 7: opens in under 1 s, every tap answers in under 0.1 s, scree
 - Sync between both phones (private Sheet).
 - Bookings from Gmail on a timer; optional KAYAK calendar link.
 - Emails: flight changes, must-see closed on its day, "download French" 3 days before.
-- Must-see hours from Google's place data, each morning. Needs a Google Cloud key with billing turned on; a family trip should stay inside Google's free monthly allowance.
+- Must-see hours each morning: Gemini + Google Search (free); OpenStreetMap as backup. No billing anywhere.
 - Walking/transit times from Google Maps, cached.
 - Holds the Gemini key and hands it to the family's phones.
 
@@ -102,13 +111,13 @@ Goal on the Pixel 7: opens in under 1 s, every tap answers in under 0.1 s, scree
 2. **Self-updating script.** The script's code lives in `script/` in this repo (no family data, keys only in Script Properties). The script pulls new code from `main` and redeploys itself at the same address, using the Apps Script API. It runs nightly, and the app asks for it when it needs a newer script version. If a new Google permission is ever needed, the script emails a one-link approval.
 3. **Fallback:** a GitHub Action deploys with `clasp`. Needs a one-time login on a computer and a token stored as a GitHub secret (broader access), so second choice.
 
-One-time setup (~15 min, computer, click-by-click steps in the README): Google Cloud project (also used for the hours check), turn on the Apps Script API and Places API, paste a short starter script, approve, deploy. Self-update is tested first thing in Phase 1; if Google blocks it, use the fallback.
+One-time setup (~15 min, computer, click-by-click steps in the README): Google Cloud project (no billing), turn on the Apps Script API, paste a short starter script, approve, deploy. Self-update is tested first thing in Phase 1; if Google blocks it, use the fallback.
 
 ## 5c. Lessons from Chef Luc, Wardrobe COO and the Control Center
 **Gemini key (easy, one paste for both phones)**
 - All Fontaine apps share one web address, so if this phone already has Chef Luc's or Wardrobe COO's key: one tap, "Use the key from Chef Luc".
 - Otherwise Chef Luc's flow: **Get a key** (opens AI Studio) → Create API key → **Paste key**; checked in ~1 s without spending a request.
-- The app hands the key to the script once; the other parent's phone picks it up on its next sync. Same for the Maps key. Never in backups or the repo.
+- The app hands the key to the script once; the other parent's phone picks it up on its next sync. Never in backups or the repo.
 
 **Gemini on the free tier**
 - Switch models when one is busy and remember the one that works.
@@ -147,4 +156,5 @@ Titles DM Serif Display, body system sans. Gold crest on Trips. Must-See badge n
 | Picked / undecided / eliminated, adding a place | List |
 | Order and timing within a day, downtime position | Days |
 | Bookings | Gmail / KAYAK (read automatically) |
-| Gemini and Google keys | Google script settings |
+| Gemini key, who this phone is, email alerts | Trips → This app |
+| Must-see or not | The star on the place's Card |

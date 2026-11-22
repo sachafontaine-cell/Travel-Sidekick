@@ -5,7 +5,7 @@ import { createStore, DEMO } from './store'
 import { merge, outbox, settings, whenChanged, type Rec } from './data'
 
 /** The script version this app needs; an older script is asked to update itself. */
-export const SCRIPT_NEEDED = 1
+export const SCRIPT_NEEDED = 2
 
 export const cursor = createStore<number>(0, 'cursor')
 export const syncState = createStore<{ at?: number; error?: string; script?: number }>({})
@@ -51,7 +51,10 @@ export async function syncNow(): Promise<void> {
     // A key saved before the script was connected: hand it over now (the script reads bookings with it).
     const k = settings.get()
     if (k.geminiKey && !k.keyShared) void shareKey(k.geminiKey)
-    if ((res.v ?? 0) < SCRIPT_NEEDED) void call({ op: 'update' }).catch(() => {})
+    if ((res.v ?? 0) < SCRIPT_NEEDED) {
+      // Ask the script to update itself; report if it can't, so the fix is visible in ⚙.
+      void call<{ ok?: boolean; v?: number }>({ op: 'update' }, 90000).then((u) => syncState.set({ ...syncState.get(), script: u.v ?? res.v, error: undefined }), (e) => syncState.set({ ...syncState.get(), error: `Script update failed: ${e instanceof Error ? e.message : e}` }))
+    }
   } catch (e) {
     syncState.set({ ...syncState.get(), error: e instanceof Error ? e.message : 'Sync failed' })
   } finally {
@@ -66,6 +69,13 @@ export async function shareKey(gk: string): Promise<boolean> {
   try { await call({ op: 'setKey', gk }); settings.set({ ...settings.get(), keyShared: true }); return true } catch { return false }
 }
 export const setAlerts = (emails: string[]) => call({ op: 'setAlerts', emails })
+export const setKayak = (url: string) => call({ op: 'setKayak', url })
+export interface FoundTrip { destination: string; start: string; end: string; bookings: Booking[] }
+/** Trips happening now or coming up, from booking emails and the KAYAK calendar (script v2+). */
+export async function findTrips(): Promise<FoundTrip[]> {
+  const j = await call<{ trips?: FoundTrip[]; error?: string }>({ op: 'trips' }, 120000)
+  return Array.isArray(j.trips) ? j.trips : []
+}
 
 export function startSync() {
   if (DEMO) return

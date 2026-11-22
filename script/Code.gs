@@ -6,12 +6,13 @@
 // What it does:
 //   sync       both phones send and fetch changes (newest change wins, per record)
 //   setKey     keeps the Gemini key so the other phone gets it automatically
-//   bookings   reads booking confirmations in Gmail for the trip dates (cleaned before Gemini)
+//   trips      finds trips happening now or coming up in booking emails and the KAYAK calendar
+//   bookings   reads booking confirmations (Gmail + KAYAK calendar) for the trip dates (cleaned before Gemini)
 //   hourly     7:00 destination time: checks must-see hours with Google, emails if one is closed
 //              3 days before a trip: emails "download the language in Google Translate"
 //   nightly    updates this script from the repository when a newer version is published
 
-var VERSION = 1
+var VERSION = 2
 var REPO_RAW = 'https://raw.githubusercontent.com/sachafontaine-cell/Travel-Sidekick/main/script/'
 var APP_URL = 'https://sachafontaine-cell.github.io/Travel-Sidekick/'
 
@@ -49,6 +50,13 @@ function doPost(e) {
     if (body.op === 'sync') return out(sync(body))
     if (body.op === 'setKey') { props.setProperty('GEMINI_KEY', String(body.gk || '').trim()); return out({ ok: true }) }
     if (body.op === 'setAlerts') { props.setProperty('ALERTS', JSON.stringify((body.emails || []).slice(0, 5).map(String))); return out({ ok: true }) }
+    if (body.op === 'setKayak') {
+      var u = String(body.url || '').trim()
+      if (u && !/^(https|webcal):\/\//.test(u)) return out({ error: 'That is not a calendar link.' })
+      props.setProperty('KAYAK_ICS', u.replace(/^webcal:/, 'https:'))
+      return out({ ok: true })
+    }
+    if (body.op === 'trips') return out({ trips: findTrips() })
     if (body.op === 'bookings') return out({ bookings: bookings(String(body.dest || ''), String(body.start || ''), String(body.end || '')) })
     if (body.op === 'update') return out(selfUpdate())
     if (body.op === 'ping') return out({ v: VERSION })
@@ -161,32 +169,76 @@ function redact(text) {
     .replace(/\+?\d[\d ().-]{8,}\d/g, '[phone]')
 }
 
-function bookings(dest, start, end) {
-  if (!dest || !start || !end) return []
-  var city = dest.split(',')[0].trim()
-  var query = '(confirmation OR confirmed OR reservation OR booking OR itinerary OR ticket) newer_than:1y'
-  var threads = GmailApp.search(query, 0, 40)
+/** Recent booking emails (last message of each thread), cleaned. `keep` filters by body. */
+function bookingTexts(keep, max) {
+  var query = '(confirmation OR confirmed OR reservation OR booking OR itinerary OR ticket OR e-ticket) newer_than:1y'
   var texts = []
-  threads.forEach(function (th) {
+  GmailApp.search(query, 0, 50).forEach(function (th) {
     th.getMessages().slice(-1).forEach(function (m) {
       var body = m.getPlainBody() || ''
-      if (body.indexOf(city) < 0 && body.indexOf(start) < 0) return
-      texts.push('Subject: ' + m.getSubject() + '\n' + redact(body.slice(0, 2500)))
+      if (keep && !keep(body)) return
+      texts.push('Subject: ' + m.getSubject() + ' | Date: ' + Utilities.formatDate(m.getDate(), 'UTC', 'yyyy-MM-dd') + '\n' + redact(body.slice(0, max || 2500)))
     })
   })
-  if (!texts.length) return []
-  var prompt = 'From these booking emails, list the bookings for a trip to ' + dest + ' from ' + start + ' to ' + end + '.\n' +
-    'Only bookings inside those dates. Reply with only a JSON array: [{"name":"short name, e.g. Louvre tickets or Flight to Paris","kind":"flight|hotel|ticket|meal|other","date":"YYYY-MM-DD","time":"HH:MM local","address":"street address or venue/airport name","note":"max 60 chars, no numbers"}]\n\n' +
-    texts.slice(0, 15).join('\n\n---\n\n')
-  var list = jsonIn(gemini(prompt))
+  return texts
+}
+
+/** Events from the KAYAK Trips calendar link (if saved): flights, hotels, reservations. */
+function kayakEvents() {
+  var url = PropertiesService.getScriptProperties().getProperty('KAYAK_ICS')
+  if (!url) return []
+  var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true })
+  if (r.getResponseCode() !== 200) return []
+  var text = r.getContentText().replace(/\r?\n[ \t]/g, '')
+  var events = []
+  text.split('BEGIN:VEVENT').slice(1).forEach(function (block) {
+    var get = function (k) { var m = new RegExp('^' + k + '[^:\\n]*:(.*)$', 'm').exec(block); return m ? m[1].trim().replace(/\\,/g, ',').replace(/\\n/g, ' ') : '' }
+    var day = function (v) { var m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/.exec(v); return m ? { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] ? m[4] + ':' + m[5] : '' } : null }
+    var s = day(get('DTSTART')), e = day(get('DTEND'))
+    if (s) events.push({ summary: get('SUMMARY'), location: get('LOCATION'), start: s.date, time: s.time, end: e ? e.date : s.date, note: get('DESCRIPTION').slice(0, 200) })
+  })
+  return events
+}
+
+var BOOKING_SHAPE = '{"name":"short name, e.g. Louvre tickets or Flight to Paris","kind":"flight|hotel|ticket|meal|other","date":"YYYY-MM-DD","time":"HH:MM local","address":"street address or venue/airport name","note":"max 60 chars, no numbers"}'
+
+function geocodeAll(list, dest) {
   var geo = Maps.newGeocoder()
-  return list.filter(function (b) { return b && b.name && b.date }).slice(0, 20).map(function (b) {
+  return list.filter(function (b) { return b && b.name && b.date }).slice(0, 25).map(function (b) {
     var lat = null, lng = null
     try {
-      var g = geo.geocode((b.address || b.name) + ', ' + dest)
+      var g = geo.geocode((b.address || b.name) + (dest ? ', ' + dest : ''))
       if (g.status === 'OK' && g.results.length) { lat = g.results[0].geometry.location.lat; lng = g.results[0].geometry.location.lng }
     } catch (e) { /* no location: the app skips it */ }
     return { name: String(b.name).slice(0, 60), kind: b.kind, date: b.date, time: b.time, lat: lat, lng: lng, note: b.note }
+  })
+}
+
+/** Bookings for one trip: booking emails + the KAYAK calendar, inside the dates. */
+function bookings(dest, start, end) {
+  if (!dest || !start || !end) return []
+  var city = dest.split(',')[0].trim()
+  var texts = bookingTexts(function (body) { return body.indexOf(city) >= 0 || body.indexOf(start) >= 0 })
+  var events = kayakEvents().filter(function (e) { return e.end >= start && e.start <= end })
+  if (!texts.length && !events.length) return []
+  var prompt = 'From these booking emails and calendar events, list the bookings for a trip to ' + dest + ' from ' + start + ' to ' + end + '.\n' +
+    'Only bookings inside those dates. Reply with only a JSON array: [' + BOOKING_SHAPE + ']\n\n' +
+    (events.length ? 'KAYAK calendar:\n' + JSON.stringify(events) + '\n\n' : '') + texts.slice(0, 15).join('\n\n---\n\n')
+  return geocodeAll(jsonIn(gemini(prompt)), dest)
+}
+
+/** Trips happening now or coming up, found in booking emails and the KAYAK calendar. */
+function findTrips() {
+  var today = Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd')
+  var events = kayakEvents().filter(function (e) { return e.end >= today })
+  var texts = bookingTexts(null, 1500)
+  if (!texts.length && !events.length) return []
+  var prompt = 'Today is ' + today + '. From these booking emails and calendar events, find the trips that are happening now or coming up (ignore past trips).\n' +
+    'Group bookings into trips by destination and dates. A trip is the main destination city (not the home airport).\n' +
+    'Reply with only a JSON array: [{"destination":"City, Country","start":"YYYY-MM-DD","end":"YYYY-MM-DD","bookings":[' + BOOKING_SHAPE + ']}]\n\n' +
+    (events.length ? 'KAYAK calendar:\n' + JSON.stringify(events) + '\n\n' : '') + texts.slice(0, 25).join('\n\n---\n\n')
+  return jsonIn(gemini(prompt)).filter(function (t) { return t && t.destination && t.start && t.end && t.end >= today }).slice(0, 6).map(function (t) {
+    return { destination: String(t.destination), start: t.start, end: t.end, bookings: geocodeAll(t.bookings || [], t.destination) }
   })
 }
 

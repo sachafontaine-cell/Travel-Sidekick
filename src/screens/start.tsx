@@ -1,7 +1,7 @@
 // First run: build the list (bookings + Gemini), plan the days, then confirm the must-sees.
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { Icon, Spinner } from '../ui'
-import { save, settings, trips } from '../lib/data'
+import { save, settings, trips, tripPlaces } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
 import { buildList, scorePlace } from '../lib/ai'
 import { autoPlan } from '../lib/rebalance'
@@ -38,8 +38,9 @@ export function Start({ trip }: { trip: Trip }) {
 
   const run = async () => {
     setPhase('building'); setErr(''); setSteps([]); setFound([])
-    const names = new Set<string>()
-    const all: Place[] = []
+    // Bookings already on the trip (from Find my trips) stay, and aren't added twice.
+    const all: Place[] = tripPlaces(trip.id)
+    const names = new Set<string>(all.map((p) => p.name.toLowerCase()))
     let base = trip.base
     try {
       let i = 0

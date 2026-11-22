@@ -61,7 +61,7 @@ describe('family script', () => {
     w.tick()
     const c = w.post({ k: 'family-key-123', op: 'sync', since: a.now, put: [{ coll: 'place', id: 'p2', at: 200, data: { id: 'p2' } }] })
     expect(c.recs.map((r: any) => r.id)).toEqual(['p2'])
-    expect(c.v).toBe(1)
+    expect(c.v).toBe(2)
   })
 
   it('shares the Gemini key with the other phone', () => {
@@ -99,16 +99,35 @@ describe('family script', () => {
     const calls: string[] = []
     w = world((url, opts) => {
       calls.push(`${(opts.method ?? 'get').toUpperCase()} ${url.replace(/^https:\/\/[^/]+/, '')}`)
-      if (url.endsWith('version.json')) return { code: 200, body: '{"version":2}' }
-      if (url.endsWith('Code.gs')) return { code: 200, body: 'var VERSION = 2\n' }
+      if (url.endsWith('version.json')) return { code: 200, body: '{"version":3}' }
+      if (url.endsWith('Code.gs')) return { code: 200, body: 'var VERSION = 3\n' }
       if (url.endsWith('appsscript.json')) return { code: 200, body: '{}' }
       if (url.endsWith('/deployments') && !opts.method?.match(/put/)) return { code: 200, body: JSON.stringify({ deployments: [{ deploymentId: 'HEAD', deploymentConfig: {} }, { deploymentId: 'web1', deploymentConfig: { versionNumber: 1 }, entryPoints: [{ entryPointType: 'WEB_APP' }] }] }) }
       if (url.endsWith('/versions')) return { code: 200, body: '{"versionNumber":7}' }
       return { code: 200, body: '{}' }
     })
-    expect(w.post({ k: 'family-key-123', op: 'update' })).toEqual({ ok: true, v: 2 })
+    expect(w.post({ k: 'family-key-123', op: 'update' })).toEqual({ ok: true, v: 3 })
     expect(calls).toContain('PUT /v1/projects/script1/content')
     expect(calls).toContain('PUT /v1/projects/script1/deployments/web1')
     expect(w.props.DEPLOYMENT_ID).toBe('web1')
+  })
+
+  it('finds trips in booking emails and the KAYAK calendar', () => {
+    const ics = 'BEGIN:VCALENDAR\nBEGIN:VEVENT\nSUMMARY:Flight to San Jose del Cabo (SJD)\nDTSTART:20261121T093000\nDTEND:20261121T130000\nLOCATION:SAN\nEND:VEVENT\nEND:VCALENDAR'
+    let prompt = ''
+    w = world((url, opts) => {
+      if (url.startsWith('https://kayak.test')) return { code: 200, body: ics }
+      if (url.includes('generativelanguage')) { prompt = JSON.parse(opts.payload).contents[0].parts[0].text; return { code: 200, body: JSON.stringify({ candidates: [{ content: { parts: [{ text: '[{"destination":"Cabo San Lucas, Mexico","start":"2026-11-21","end":"2026-11-26","bookings":[{"name":"Hotel Riu","kind":"hotel","date":"2026-11-21","address":"Cabo"}]},{"destination":"Old","start":"2020-01-01","end":"2020-01-02","bookings":[]}]' }] } }] }) } }
+      return { code: 404, body: '' }
+    })
+    w.ctx.GmailApp.search = () => [{ getMessages: () => [{ getPlainBody: () => 'Your stay at Hotel Riu, card 4111 1111 1111 1111', getSubject: () => 'Confirmation', getDate: () => new Date() }] }]
+    w.post({ k: 'family-key-123', op: 'setKey', gk: 'AIza' })
+    expect(w.post({ k: 'family-key-123', op: 'setKayak', url: 'webcal://nope' })).toEqual({ ok: true })
+    w.props.KAYAK_ICS = 'https://kayak.test/ical/abc'
+    const r = w.post({ k: 'family-key-123', op: 'trips' })
+    expect(r.trips.map((t: any) => t.destination)).toEqual(['Cabo San Lucas, Mexico'])
+    expect(r.trips[0].bookings[0]).toMatchObject({ name: 'Hotel Riu', kind: 'hotel', lat: 48.86 })
+    expect(prompt).toContain('Flight to San Jose del Cabo')
+    expect(prompt).not.toContain('4111')
   })
 })

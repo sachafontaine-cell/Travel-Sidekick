@@ -52,7 +52,10 @@ export function defaultFamily(trips: Pick<Trip, 'people' | 'start' | 'at'>[], on
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('chef-luc:settings') : null
     const fam = (raw ? JSON.parse(raw)?.family : null) as { name: string; adult: boolean; birth?: string }[] | null
     if (!Array.isArray(fam)) return []
-    return fam.filter((m) => m && m.name).map((m) => ({
+    // "Adulte 1", "Adult 2", "Enfant 1"… are placeholders, not names: not worth copying.
+    const real = fam.filter((m) => m && m.name && !/^(adulte?|adult|enfant|child|kid)\s*\d*$/i.test(String(m.name).trim()))
+    if (!real.length) return []
+    return real.map((m) => ({
       id: Math.random().toString(36).slice(2, 10), name: String(m.name),
       age: (m.birth ? ageOn(m.birth, on) : undefined) ?? (m.adult ? 40 : 10),
     }))

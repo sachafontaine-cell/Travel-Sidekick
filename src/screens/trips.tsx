@@ -1,4 +1,11 @@
-import { Crest, Icon } from '../ui'
+import { useEffect, useState } from 'preact/hooks'
+import { Crest, Icon, Sheet, Spinner } from '../ui'
+import { save, settings } from '../lib/data'
+import { connected, findTrips, type FoundTrip } from '../lib/sync'
+import { findCity } from '../lib/weather'
+import { bookingPlace } from './start'
+import { between } from '../lib/rank'
+import { saveTrip } from '../lib/actions'
 import { trips, nowIn } from '../lib/data'
 import { DEMO } from '../lib/store'
 import { go, open, tripPath } from '../lib/nav'
@@ -29,6 +36,7 @@ export function Trips() {
           {!DEMO && <button class="btn btn-primary btn-sm press" onClick={() => { const t = newTrip(); go(tripPath(t.id, 'setup')) }}>+ New trip</button>}
         </div>
       </div>
+      {connected() && <button class="btn btn-secondary press" onClick={() => open({ kind: 'sheet', name: 'found' })}><Icon.refresh />Find my trips (email and KAYAK)</button>}
       {DEMO && <div class="banner"><span class="dot" /><span class="grow small">Sample trip. Nothing here touches your own trips.</span><a class="link small" href={location.pathname}>Leave</a></div>}
 
       {now.length > 0 && <span class="label">Happening now</span>}
@@ -68,5 +76,51 @@ export function Trips() {
       {past.length > 0 && <span class="label">Past</span>}
       {past.length > 0 && <div class="list">{past.map((t) => <button class="kv press" onClick={() => openTrip(t)}><span>{t.name}</span><span class="v">{dateRange(t.start, t.end)}</span></button>)}</div>}
     </main>
+  )
+}
+
+/** Trips found in booking emails and the KAYAK calendar; one tap adds one, with its bookings. */
+export function FoundSheet() {
+  const [state, setState] = useState<{ busy: boolean; list?: FoundTrip[]; err?: string; adding?: string }>({ busy: false })
+  settings.use(); trips.use()
+  const run = async () => {
+    setState({ busy: true })
+    try { setState({ busy: false, list: await findTrips() }) } catch (e) {
+      const m = e instanceof Error ? e.message : 'Could not read your email.'
+      setState({ busy: false, err: /unknown request/i.test(m) ? 'The family script is updating itself to the new version. Try again in a minute.' : m })
+    }
+  }
+  useEffect(() => { void run() }, [])
+  const have = (f: FoundTrip) => Object.values(trips.get()).some((t) => t.start === f.start && t.dest.name.split(',')[0].toLowerCase() === f.destination.split(',')[0].toLowerCase())
+  const add = async (f: FoundTrip) => {
+    setState({ ...state, adding: f.destination })
+    try {
+      const cities = await findCity(f.destination.split(',')[0]).catch(() => [])
+      const t = newTrip()
+      const hotel = f.bookings.find((b) => b.kind === 'hotel' && b.lat != null && b.lng != null)
+      const dest = cities[0] ?? { ...t.dest, name: f.destination, lat: hotel?.lat ?? 0, lng: hotel?.lng ?? 0 }
+      const trip = { ...t, name: dest.name.split(',')[0], dest, start: f.start, end: f.end, base: hotel ? { name: hotel.name, lat: hotel.lat!, lng: hotel.lng! } : undefined }
+      saveTrip(trip)
+      let rank: string | undefined
+      const ps = f.bookings.map((b) => { rank = between(rank, undefined); return bookingPlace(b, trip, 'a' + rank) }).filter((p): p is NonNullable<typeof p> => !!p)
+      if (ps.length) save('place', ps)
+      go(tripPath(trip.id, 'setup'), true)
+    } catch (e) { setState({ ...state, adding: undefined, err: e instanceof Error ? e.message : 'Could not add it.' }) }
+  }
+  return (
+    <Sheet title="Find my trips">
+      {state.busy && <div class="row muted"><Spinner />Reading your booking emails and KAYAK calendar… up to a minute.</div>}
+      {state.err && <><p class="answer err">{state.err}</p><button class="btn btn-quiet press" onClick={run}>Try again</button></>}
+      {state.list && !state.list.length && <p class="muted">No upcoming trips found. Forward booking emails to your Gmail, or add your KAYAK calendar link in ⚙ This app.</p>}
+      {state.list?.map((f) => (
+        <div class="card card-pad stack">
+          <div class="between"><b>{f.destination}</b><span class="muted small">{dateRange(f.start, f.end)}</span></div>
+          <span class="muted small">{f.bookings.length ? f.bookings.slice(0, 4).map((b) => b.name).join(' · ') + (f.bookings.length > 4 ? ` · +${f.bookings.length - 4}` : '') : 'No bookings details'}</span>
+          {have(f) ? <span class="chip ok" style={{ alignSelf: 'flex-start' }}>Already added</span>
+            : <button class="btn btn-primary btn-sm press" disabled={!!state.adding} onClick={() => add(f)}>{state.adding === f.destination ? <Spinner /> : 'Add this trip'}</button>}
+        </div>
+      ))}
+      <p class="muted small">Then check who's coming and tap Build my list.</p>
+    </Sheet>
   )
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { Icon, Sheet, Spinner } from '../ui'
 import { settings, trips } from '../lib/data'
 import { flashModels, AiError } from '../lib/gemini'
-import { connected, familyKey, setAlerts, shareKey, syncNow, syncState } from '../lib/sync'
+import { connected, familyKey, setAlerts, setKayak, shareKey, syncNow, syncState } from '../lib/sync'
 import { applyUpdate, checkForUpdate } from '../lib/update'
 import { DEMO } from '../lib/store'
 
@@ -126,6 +126,23 @@ function Version() {
   )
 }
 
+function Kayak() {
+  const s = settings.use()
+  const [url, setUrl] = useState(s.kayak ?? '')
+  const [msg, setMsg] = useState('')
+  if (!connected()) return <p class="muted">Connect the family script first.</p>
+  const save = async () => {
+    try { await setKayak(url.trim()); settings.set({ ...settings.get(), kayak: url.trim() }); setMsg(url.trim() ? 'Saved. Find my trips now reads it too.' : 'Removed.') } catch (e) { setMsg(e instanceof Error ? e.message : 'Could not save.') }
+  }
+  return (
+    <div class="stack">
+      <p class="muted small">KAYAK has no way for apps to sign in, but KAYAK Trips can share a private calendar link: in KAYAK, Trips → Settings → Calendar sync → copy the link.</p>
+      <div class="row"><input class="field grow" inputMode="url" placeholder="https://www.kayak.com/trips/ical/…" value={url} onInput={(e) => setUrl((e.target as HTMLInputElement).value)} /><button class="btn btn-primary btn-sm press" onClick={save}>Save</button></div>
+      {msg && <p class="muted small">{msg}</p>}
+    </div>
+  )
+}
+
 export function AppSheet() {
   return (
     <Sheet title="This app">
@@ -133,6 +150,7 @@ export function AppSheet() {
       <div class="stack"><span class="label">Gemini key</span><KeyBox /></div>
       <div class="stack"><span class="label">Family script (sync, emails)</span><Family /></div>
       <div class="stack"><span class="label">Email alerts</span><Alerts /></div>
+      <div class="stack"><span class="label">KAYAK calendar (optional)</span><Kayak /></div>
       <Version />
     </Sheet>
   )

@@ -22,6 +22,7 @@ export interface Settings {
   badApi?: string
   /** The Gemini key has been handed to the family script. */
   keyShared?: boolean
+  kayak?: string
   energy?: { date: string; level: Energy }
 }
 export const settings = createStore<Settings>({}, 'settings')

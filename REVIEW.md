@@ -39,6 +39,7 @@ Same tokens as Chef Luc and Wardrobe COO:
 - **Day shape:** start and end, each with −/+ (15 min steps), suggestion in parentheses, "Custom" tag. Booked tickets keep their time.
 - **Downtime:** not a set time. Setup holds on/off and length; each day fits it in like an activity (after lunch when it can), and it can be dragged in Days.
 - **Activity Card:** a dialog over the current screen. Closes with the X or a tap outside.
+- **Talk (live translator):** on the Trip tab next to Snap. Two mic buttons (I speak / Parlez), each line shown in both languages and read out loud, "Show big text to the waiter", swap languages. Free: Chrome speech recognition + Gemini (knows the menu snaps) + the phone's voice. Needs internet; link to Google Translate for offline.
 
 ## Open issues
 1. **Budget, pace, crowd** segments are drawn as text, not buttons. Fix in the build (real buttons, 44 px).
@@ -63,7 +64,7 @@ Same tokens as Chef Luc and Wardrobe COO:
 **Phases**
 1. Core: Trips, Setup, List, Activity Card, Days, Must-sees. Demo data. Sync.
 2. Smart: Ask (Gemini), What now?, rain plan B, bookings from email, leave-by.
-3. Snap (camera → Gemini: translate, bill check), Prep, Ghost guide.
+3. Snap (camera → Gemini: translate, bill check), Talk (live translator), Prep, Ghost guide.
 
 ## 5. Where to change what (draft, one place each)
 | Thing | Change it in |

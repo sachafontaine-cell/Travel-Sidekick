@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Talk – live translator</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#14213D}a:hover{color:#7A5600}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F7F3EA; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #14213D; padding: 52px 16px 92px; display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden">
+<div style="display: flex; align-items: center; gap: 12px"><a href="Snap.dc.html" aria-label="Back" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 22px; background: #FFFFFF; border: 1px solid #E0D8C6; color: #14213D; text-decoration: none; font-size: 20px">‹</a><div style="flex: 1; display: flex; flex-direction: column"><h1 style="margin: 0; font-family: 'DM Serif Display', Georgia, serif; font-size: 26px; font-weight: 400">Talk</h1><span style="font-size: 14px; color: #55524B">Live translator, out loud</span></div><button aria-label="Swap languages" style="height: 44px; padding: 0 12px; border-radius: 22px; border: 1px solid #CFC5AE; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700">EN ⇄ FR</button></div>
+<span style="align-self: flex-start; padding: 6px 10px; border-radius: 8px; background: #E9EFE4; color: #2E4A2B; font-size: 13px; font-weight: 600">Knows: your Le Fumoir menu snap</span>
+<div style="align-self: flex-start; border-radius: 18px 18px 18px 4px; background: #FFFFFF; border: 1px solid #E0D8C6; max-width: 88%; padding: 12px 8px 12px 14px; display: flex; gap: 6px; align-items: flex-start"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 700; color: #55524B">Waiter · French</span><span style="font-size: 18px; font-weight: 600; line-height: 1.3">Have you chosen? Today’s special is duck confit.</span><span style="font-size: 13px; color: #55524B">« Vous avez choisi ? Le plat du jour, c’est le confit de canard. »</span></div><button aria-label="Play again: waiter" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; border: none; background: transparent; color: inherit"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7"></path></svg></button></div>
+<div style="align-self: flex-end; border-radius: 18px 18px 4px 18px; background: #14213D; color: #F7F3EA; max-width: 88%; padding: 12px 8px 12px 14px; display: flex; gap: 6px; align-items: flex-start"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 700; color: #C9C3B5">You · English</span><span style="font-size: 18px; font-weight: 600; line-height: 1.3">Deux croque-monsieur, s’il vous plaît. Le confit de canard, c’est bien pour les enfants ?</span><span style="font-size: 13px; color: #C9C3B5">Two croque-monsieurs. Is the duck confit good for kids?</span></div><button aria-label="Play again: you" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; border: none; background: transparent; color: inherit"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7"></path></svg></button></div>
+<div style="align-self: flex-start; border-radius: 18px 18px 18px 4px; background: #FFFFFF; border: 1px solid #E0D8C6; max-width: 88%; padding: 12px 8px 12px 14px; display: flex; gap: 6px; align-items: flex-start"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 700; color: #55524B">Waiter · French</span><span style="font-size: 18px; font-weight: 600; line-height: 1.3">Yes, kids love it. And to drink?</span><span style="font-size: 13px; color: #55524B">« Oui, les enfants adorent. Et pour boire ? »</span></div><button aria-label="Play again: waiter" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; border: none; background: transparent; color: inherit"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7"></path></svg></button></div>
+<div style="flex-grow: 1"></div>
+<button style="height: 48px; border-radius: 14px; border: 1.5px solid #14213D; background: #FFFFFF; font: inherit; font-size: 15px; font-weight: 600">Show big text to the waiter</button>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<button style="height: 84px; border-radius: 18px; border: none; background: #14213D; color: #F7F3EA; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg><span style="font-size: 16px; font-weight: 700">I speak</span><span style="font-size: 12px">English</span></button>
+<button style="height: 84px; border-radius: 18px; border: none; background: #D9A21B; color: #14213D; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg><span style="font-size: 16px; font-weight: 700">Parlez</span><span style="font-size: 12px">Français</span></button>
+</div>
+<span style="font-size: 12px; color: #55524B; text-align: center">Needs internet. No signal? <a href="https://translate.google.com" target="_blank" rel="noopener" style="font-weight: 700">Open Google Translate ↗</a></span>
+<nav aria-label="Main" style="position: absolute; left: 0; right: 0; bottom: 0; height: 76px; background: #FFFFFF; border-top: 1px solid #E0D8C6; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding-bottom: 10px; box-sizing: border-box">
+<a href="Today.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 600; color: #55524B; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"></path></svg>Today</a>
+<a href="List.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 600; color: #55524B; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>List</a>
+<a href="Day.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 600; color: #55524B; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M3 9h18M8 2v4M16 2v4"></path></svg>Days</a>
+<a href="Countdown.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 600; color: #55524B; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"></path></svg>Must-sees</a>
+<a href="Snap.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 700; color: #14213D; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>Trip</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

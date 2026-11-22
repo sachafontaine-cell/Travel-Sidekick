@@ -10,11 +10,15 @@ import { dateOf, tripDays } from './planner'
 import type { Place, Trip } from './model'
 import { findPhotos, wantsPhoto } from './photos'
 
+// Each job runs one at a time, and at most every `every` ms, even when it fails (no retry storm
+// while you move between screens; it tries again later).
 const busy = new Set<string>()
-async function once(key: string, job: () => Promise<void>) {
-  if (busy.has(key)) return
+const lastRun = new Map<string, number>()
+async function once(key: string, job: () => Promise<void>, every = 10 * 60000) {
+  if (busy.has(key) || Date.now() - (lastRun.get(key) ?? 0) < every) return
   busy.add(key)
-  try { await job() } catch { /* try again next time */ } finally { busy.delete(key) }
+  lastRun.set(key, Date.now())
+  try { await job() } catch { /* try again later */ } finally { busy.delete(key) }
 }
 
 /** Must-sees planned today and the next 2 days get their hours checked with Google each morning. */
@@ -22,7 +26,7 @@ async function hoursJob(trip: Trip) {
   if (DEMO || !settings.get().geminiKey) return
   const now = nowIn(trip)
   const today = Math.max(1, now.day)
-  const morning = Date.now() - (now.min - 5 * 60) * 60000 // ~5 AM today, destination time
+  const morning = Date.now() - (((now.min - 5 * 60) + 1440) % 1440) * 60000 // the last 5 AM, destination time
   const due: { place: Place; date: string }[] = []
   for (const p of tripPlaces(trip.id)) {
     if (!p.must || p.done || p.status === 'out' || p.day == null || p.day < today || p.day > Math.min(tripDays(trip), today + 2)) continue
@@ -45,7 +49,8 @@ async function hoursJob(trip: Trip) {
 /** Photos for places you'll see soon: today's and upcoming days first, then picked, then the rest. */
 export async function photoFor(p: Place, trip: Trip) {
   if (!wantsPhoto(p) || (typeof navigator !== 'undefined' && navigator.onLine === false)) return
-  const photos = await findPhotos(p, trip)
+  let photos
+  try { photos = await findPhotos(p, trip) } catch { return } // bad connection: try another time
   const cur = places.get()[p.id]
   if (cur && !cur.photos) save('place', [{ ...cur, photos }])
 }
@@ -67,9 +72,9 @@ function run() {
     const rate = await fetchRate(trip.dest.currency, trip.home)
     if (rate) save('trip', [{ ...trips.get()[trip.id], fx: { rate, at: Date.now() } }])
   })
-  void once('wx' + trip.id, () => refreshWeather(trip, now.day >= 1 && now.day <= tripDays(trip) ? now.date : trip.start, Math.floor(now.min / 60)))
-  void once('hours' + trip.id, () => hoursJob(trip))
-  void once('photos' + trip.id, () => photosJob(trip))
+  void once('wx' + trip.id + now.date, () => refreshWeather(trip, now.day >= 1 && now.day <= tripDays(trip) ? now.date : trip.start, Math.floor(now.min / 60)))
+  void once('hours' + trip.id, () => hoursJob(trip), 3 * 3600000)
+  void once('photos' + trip.id, () => photosJob(trip), 5 * 60000)
   void once('rules' + trip.id, async () => {
     if (DEMO || !trip.built || trip.rules?.length || !settings.get().geminiKey) return
     const rules = await localRules(trip)

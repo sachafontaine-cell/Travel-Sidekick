@@ -12,7 +12,7 @@
 //              3 days before a trip: emails "download the language in Google Translate"
 //   nightly    updates this script from the repository when a newer version is published
 
-var VERSION = 4
+var VERSION = 5
 var REPO_RAW = 'https://raw.githubusercontent.com/sachafontaine-cell/Travel-Sidekick/main/script/'
 var APP_URL = 'https://sachafontaine-cell.github.io/Travel-Sidekick/'
 
@@ -54,7 +54,7 @@ function doPost(e) {
       var u = String(body.url || '').trim()
       if (u && !/^(https|webcal):\/\//.test(u)) return out({ error: 'That is not a calendar link.' })
       props.setProperty('KAYAK_ICS', u.replace(/^webcal:/, 'https:'))
-      props.deleteProperty('KAYAK_SEEN')
+      stateSet('KAYAK_SEEN', [])
       requestScan()
       return out({ ok: true })
     }
@@ -80,6 +80,29 @@ function sheet() {
   var sh = ss.getSheetByName('records')
   if (!sh) { sh = ss.insertSheet('records'); sh.appendRow(['key', 'coll', 'at', 'serverAt', 'data']) }
   return sh
+}
+
+/** Lists the script remembers (emails read, alerts sent, suggestions): kept in the Sheet's "state"
+ *  tab, because a script setting can hold only 9 KB. */
+function stateSheet() {
+  var ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SHEET_ID'))
+  return ss.getSheetByName('state') || ss.insertSheet('state')
+}
+function stateGet(name, fallback) {
+  var sh = stateSheet(), last = sh.getLastRow()
+  var rows = last ? sh.getRange(1, 1, last, 2).getValues() : []
+  for (var i = 0; i < rows.length; i++) if (rows[i][0] === name) { try { return JSON.parse(rows[i][1]) } catch (e) { return fallback } }
+  // Older versions kept these in the script settings: move them over once.
+  var old = PropertiesService.getScriptProperties().getProperty(name)
+  return old ? JSON.parse(old) : fallback
+}
+function stateSet(name, value) {
+  var sh = stateSheet(), last = sh.getLastRow()
+  var rows = last ? sh.getRange(1, 1, last, 1).getValues() : []
+  var json = JSON.stringify(value)
+  for (var i = 0; i < rows.length; i++) if (rows[i][0] === name) { sh.getRange(i + 1, 2).setValue(json); return }
+  sh.appendRow([name, json])
+  PropertiesService.getScriptProperties().deleteProperty(name)
 }
 
 function readRows(sh) {
@@ -186,7 +209,7 @@ function redact(text) {
 
 /** Booking emails not read yet (remembered by thread), fetched in one batch. */
 function newBookingMail() {
-  var seen = JSON.parse(PropertiesService.getScriptProperties().getProperty('SEEN') || '[]')
+  var seen = stateGet('SEEN', [])
   var query = '(confirmation OR confirmed OR reservation OR booking OR itinerary OR "e-ticket" OR "check-in" OR "your trip") newer_than:180d'
   var threads = GmailApp.search(query, 0, 80).filter(function (t) { return seen.indexOf(t.getId()) < 0 }).slice(0, 25)
   if (!threads.length) return { texts: [], ids: [] }
@@ -259,17 +282,19 @@ function suggest(g, found, dismissed) {
 
 /** Suggestions still worth showing: not over, and not covered by a trip the family has made. */
 function suggestions() {
+  var found = stateGet('FOUND', [])
+  if (!found.length) return []
   var today = Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd')
   var trips = allRecords('trip')
-  return JSON.parse(PropertiesService.getScriptProperties().getProperty('FOUND') || '[]').filter(function (f) { return f.end >= today && !overlapping(trips, f.start, f.end) })
+  return found.filter(function (f) { return f.end >= today && !overlapping(trips, f.start, f.end) })
 }
 
 function dismiss(id) {
   var props = PropertiesService.getScriptProperties()
-  var found = JSON.parse(props.getProperty('FOUND') || '[]')
+  var found = stateGet('FOUND', [])
   var f = found.filter(function (x) { return x.id === id })[0]
-  if (f) props.setProperty('DISMISSED', JSON.stringify(JSON.parse(props.getProperty('DISMISSED') || '[]').concat([f.key]).slice(-100)))
-  props.setProperty('FOUND', JSON.stringify(found.filter(function (x) { return x.id !== id })))
+  if (f) stateSet('DISMISSED', stateGet('DISMISSED', []).concat([f.key]).slice(-200))
+  stateSet('FOUND', found.filter(function (x) { return x.id !== id }))
 }
 
 function dayNumber(trip, date) {
@@ -304,7 +329,7 @@ function scan() {
   var today = Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd')
   try {
     var mail = newBookingMail()
-    var kSeen = JSON.parse(props.getProperty('KAYAK_SEEN') || '[]')
+    var kSeen = stateGet('KAYAK_SEEN', [])
     var events = kayakEvents().filter(function (e) { return e.end >= today && kSeen.indexOf(e.summary + '|' + e.start) < 0 })
     if (!mail.texts.length && !events.length) { props.setProperty('SCAN', JSON.stringify({ at: now, added: 0, trips: 0 })); return { added: 0, trips: 0 } }
     var trips = allRecords('trip')
@@ -316,8 +341,8 @@ function scan() {
       (events.length ? 'KAYAK calendar:\n' + JSON.stringify(events) + '\n\n' : '') + mail.texts.join('\n\n---\n\n')
     var groups = jsonIn(gemini(prompt))
     var places = allRecords('place')
-    var found = JSON.parse(props.getProperty('FOUND') || '[]')
-    var dismissed = JSON.parse(props.getProperty('DISMISSED') || '[]')
+    var found = stateGet('FOUND', [])
+    var dismissed = stateGet('DISMISSED', [])
     var puts = {}, added = 0, newTrips = 0
     var put = function (coll, d) { puts[coll + ':' + d.id] = { coll: coll, id: d.id, at: d.at, data: d } }
     groups.forEach(function (g) {
@@ -345,10 +370,9 @@ function scan() {
     })
     var list = Object.keys(puts).map(function (k) { return puts[k] })
     if (list.length) putRecords(list, now)
-    props.setProperty('FOUND', JSON.stringify(found.slice(-10)))
-    var seen = JSON.parse(props.getProperty('SEEN') || '[]').concat(mail.ids)
-    props.setProperty('SEEN', JSON.stringify(seen.slice(-800)))
-    props.setProperty('KAYAK_SEEN', JSON.stringify(kSeen.concat(events.map(function (e) { return e.summary + '|' + e.start })).slice(-400)))
+    stateSet('FOUND', found.slice(-10))
+    stateSet('SEEN', stateGet('SEEN', []).concat(mail.ids).slice(-3000))
+    stateSet('KAYAK_SEEN', kSeen.concat(events.map(function (e) { return e.summary + '|' + e.start })).slice(-1000))
     props.setProperty('SCAN', JSON.stringify({ at: now, added: added, trips: newTrips }))
     return { added: added, trips: newTrips }
   } catch (e) {
@@ -370,11 +394,9 @@ function scanNow() {
 // ---------- Timed jobs ----------
 
 function sentBefore(id) {
-  var props = PropertiesService.getScriptProperties()
-  var sent = JSON.parse(props.getProperty('SENT') || '[]')
+  var sent = stateGet('SENT', [])
   if (sent.indexOf(id) >= 0) return true
-  sent.push(id)
-  props.setProperty('SENT', JSON.stringify(sent.slice(-300)))
+  stateSet('SENT', sent.concat([id]).slice(-1000))
   return false
 }
 

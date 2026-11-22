@@ -22,6 +22,7 @@ export function Photos({ p, size = 'big' }: { p: Place; size?: 'big' | 'thumb' }
   )
 }
 
+const tried = new Set<string>()
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const REC = { pay: 'Pay for it', cheaper: 'Do the cheaper version', skip: 'Skip it' }
 
@@ -29,7 +30,7 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
   const p = places.use()[id]
   const [why, setWhy] = useState(false)
   // Photos are looked up in the background; if this one hasn't been yet, do it now (never blocks).
-  useEffect(() => { if (p && !p.photos) void photoFor(p, trip) }, [id])
+  useEffect(() => { if (p && !p.photos && !tried.has(id)) { tried.add(id); void photoFor(p, trip) } }, [id])
   if (!p) return null
   const now = nowIn(trip)
   const day = p.day ?? null

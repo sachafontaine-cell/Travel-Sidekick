@@ -77,12 +77,12 @@ export function DaySheet({ trip, id }: { trip: Trip; id: string }) {
       <div class="list">
         {Array.from({ length: n }, (_, i) => i + 1).map((d) => {
           const date = dateOf(trip, d)
-          const closed = hoursOn(p, date) === null
+          const closed = hoursOn(p, date) === null || (p.fixed != null && !!p.booked && p.day != null && p.day !== d)
           const pl = planDay(trip, d, tripPlaces(trip.id))
           return (
             <button class="kv press" disabled={closed} style={closed ? { opacity: 0.5 } : undefined} onClick={() => { setDay(p.id, d); close() }}>
               <span><b>Day {d}</b> · {WEEKDAY[weekday(date)]} {shortDate(date)}</span>
-              <span class="v">{p.day === d ? <span class="chip ok">Here</span> : closed ? 'Closed' : `${pl.slots.filter((s) => s.kind === 'place').length} stops`}</span>
+              <span class="v">{p.day === d ? <span class="chip ok">Here</span> : p.fixed != null && p.booked ? 'Booked on another day' : closed ? 'Closed' : `${pl.slots.filter((s) => s.kind === 'place').length} stops`}</span>
             </button>
           )
         })}

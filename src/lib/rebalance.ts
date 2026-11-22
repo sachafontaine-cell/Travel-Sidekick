@@ -169,7 +169,7 @@ export function rebalance(trip: Trip, all: Place[], metas: Record<string, DayMet
 export function slotBookings(trip: Trip, all: Place[], metas: Record<string, DayMeta> = {}): Place[] {
   const work = all.map((p) => ({ ...p }))
   const moved: Place[] = []
-  const fresh = work.filter((p) => p.booked && p.day != null && p.fixed != null && (p.dayRank ?? '').startsWith('a') && (p.dayRank ?? '').endsWith('i'))
+  const fresh = work.filter((p) => p.booked && p.day != null && p.fixed != null && !p.slotted && /^a[0-9a-z]+i$/.test(p.dayRank ?? ''))
   for (const p of fresh.sort((a, b) => (a.fixed ?? 0) - (b.fixed ?? 0))) {
     const others = dayPlaces(work, p.day!).filter((x) => x.id !== p.id)
     let best: { rank: string; cost: number } | null = null
@@ -181,7 +181,9 @@ export function slotBookings(trip: Trip, all: Place[], metas: Record<string, Day
       const cost = (slot.warn ? 1000 : 0) + plan.issues.length * 100 + (slot.wait ?? 0) + (plan.late ? 50 : 0)
       if (!best || cost < best.cost) best = { rank: p.dayRank, cost }
     }
-    if (best) { p.dayRank = best.rank; moved.push(p) }
+    p.slotted = true
+    if (best) p.dayRank = best.rank
+    moved.push(p)
   }
   return moved
 }

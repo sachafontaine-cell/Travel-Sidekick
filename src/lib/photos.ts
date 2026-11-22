@@ -40,8 +40,11 @@ const sized = (src: string, w = 480) => {
   return u.replace(/\/(\d+)px-([^/]+)$/, `/${w}px-$2`)
 }
 
+/** null = definitely nothing there (404); a network or server problem throws, so nothing is saved. */
 async function json<T>(url: string): Promise<T | null> {
-  try { const r = await fetch(url); return r.ok ? ((await r.json()) as T) : null } catch { return null }
+  const r = await fetch(url)
+  if (r.status === 429 || r.status >= 500) throw new Error('Wikipedia busy')
+  return r.ok ? ((await r.json()) as T) : null
 }
 
 interface Summary { type?: string; title: string; wikibase_item?: string; coordinates?: { lat: number; lon: number }; thumbnail?: { source: string } }

@@ -133,5 +133,15 @@ describe('bookings from email', () => {
     expect(plan.slots.filter((s) => s.place).map((s) => s.place!.name).at(-1)).toBe(dinner.name)
     expect(plan.slots.find((s) => s.place?.name === 'Montmartre + Sacré-Cœur')!.start).toBeLessThan(12 * 60)
     expect(plan.slots.find((s) => s.id === 'mail-1')!.warn).toBeUndefined()
+    // Slotted once: the next sync must not move it again (no endless re-saving).
+    expect(slotBookings(trip, after)).toEqual([])
+  })
+  it('a booking far away (the flight from home) does not drag the day across the world', () => {
+    const { trip, places } = demoTrip()
+    const flight = { ...places[0], id: 'fl', name: 'Flight to Paris', kind: 'other' as const, lat: 32.7338, lng: -117.1933, day: 1, dayRank: 'a', fixed: 8 * 60, minutes: 60, must: false, booked: 'Booked · from your email', hours: undefined }
+    const plan = planDay(trip, 1, [...places, flight])
+    expect(plan.issues).toEqual([])
+    expect(plan.walkMi).toBeLessThan(plan.limitMi)
+    expect(plan.slots.find((s) => s.place?.name === 'Arc de Triomphe')!.start).toBeLessThan(14 * 60)
   })
 })

@@ -8,22 +8,26 @@ const code = readFileSync(new URL('../script/Code.gs', import.meta.url), 'utf8')
 
 function world(fetchImpl: (url: string, opts: any) => { code: number; body: string } = () => ({ code: 404, body: '' })) {
   const props: Record<string, string> = { KEY: 'family-key-123', SHEET_ID: 'sheet1' }
-  let rows: any[][] = [['key', 'coll', 'at', 'serverAt', 'data']]
+  const tabs: Record<string, any[][]> = { records: [['key', 'coll', 'at', 'serverAt', 'data']] }
   const mails: any[] = []
   const fetched: { url: string; opts: any }[] = []
-  const sheet = {
-    getLastRow: () => rows.length,
-    appendRow: (r: any[]) => rows.push(r),
-    getRange: (r: number, c: number, n: number, w: number) => ({
-      getValues: () => rows.slice(r - 1, r - 1 + n).map((x) => x.slice(c - 1, c - 1 + w)),
-      setValues: (v: any[][]) => { rows = [...rows.slice(0, r - 1), ...v, ...rows.slice(r - 1 + n)] },
-    }),
+  const sheetOf = (name: string) => {
+    const rows = () => (tabs[name] ??= [])
+    return {
+      getLastRow: () => rows().length,
+      appendRow: (r: any[]) => rows().push(r),
+      getRange: (r: number, c: number, n = 1, w = 1) => ({
+        getValues: () => rows().slice(r - 1, r - 1 + n).map((x) => x.slice(c - 1, c - 1 + w)),
+        setValues: (v: any[][]) => { const all = rows(); v.forEach((row, i) => { all[r - 1 + i] = [...(all[r - 1 + i] ?? []).slice(0, c - 1), ...row] }) },
+        setValue: (v: any) => { const all = rows(); (all[r - 1] ??= [])[c - 1] = v },
+      }),
+    }
   }
   let clock = 1_800_000_000_000
   const ctx: any = {
-    PropertiesService: { getScriptProperties: () => ({ getProperty: (k: string) => props[k] ?? null, setProperty: (k: string, v: string) => { props[k] = v } }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: (k: string) => props[k] ?? null, setProperty: (k: string, v: string) => { if (v.length > 9000) throw new Error('Property too big'); props[k] = v }, deleteProperty: (k: string) => { delete props[k] } }) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
-    SpreadsheetApp: { openById: () => ({ getSheetByName: () => sheet, insertSheet: () => sheet }) },
+    SpreadsheetApp: { openById: () => ({ getSheetByName: (n: string) => (tabs[n] ? sheetOf(n) : null), insertSheet: (n: string) => { tabs[n] = []; return sheetOf(n) } }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (s: string) => ({ setMimeType: () => JSON.parse(s) }) },
     MailApp: { sendEmail: (m: any) => mails.push(m) },
     Session: { getEffectiveUser: () => ({ getEmail: () => 'owner@example.com' }) },
@@ -45,7 +49,7 @@ function world(fetchImpl: (url: string, opts: any) => { code: number; body: stri
   ctx.Date = class extends Date { constructor(...a: any[]) { super(...(a.length ? a : [clock])) } static now() { return clock } }
   vm.runInContext('Date = this.Date', ctx)
   const post = (body: object) => ctx.doPost({ postData: { contents: JSON.stringify(body) } })
-  return { ctx, post, props, mails, fetched, rows: () => rows, tick }
+  return { ctx, post, props, mails, fetched, tabs, tick }
 }
 
 describe('family script', () => {
@@ -66,7 +70,7 @@ describe('family script', () => {
     w.tick()
     const c = w.post({ k: 'family-key-123', op: 'sync', since: a.now, put: [{ coll: 'place', id: 'p2', at: 200, data: { id: 'p2' } }] })
     expect(c.recs.map((r: any) => r.id)).toEqual(['p2'])
-    expect(c.v).toBe(4)
+    expect(c.v).toBe(5)
   })
 
   it('shares the Gemini key with the other phone', () => {
@@ -104,14 +108,14 @@ describe('family script', () => {
     const calls: string[] = []
     w = world((url, opts) => {
       calls.push(`${(opts.method ?? 'get').toUpperCase()} ${url.replace(/^https:\/\/[^/]+/, '')}`)
-      if (url.endsWith('version.json')) return { code: 200, body: '{"version":5}' }
-      if (url.endsWith('Code.gs')) return { code: 200, body: 'var VERSION = 5\n' }
+      if (url.endsWith('version.json')) return { code: 200, body: '{"version":6}' }
+      if (url.endsWith('Code.gs')) return { code: 200, body: 'var VERSION = 6\n' }
       if (url.endsWith('appsscript.json')) return { code: 200, body: '{}' }
       if (url.endsWith('/deployments') && !opts.method?.match(/put/)) return { code: 200, body: JSON.stringify({ deployments: [{ deploymentId: 'HEAD', deploymentConfig: {} }, { deploymentId: 'web1', deploymentConfig: { versionNumber: 1 }, entryPoints: [{ entryPointType: 'WEB_APP' }] }] }) }
       if (url.endsWith('/versions')) return { code: 200, body: '{"versionNumber":7}' }
       return { code: 200, body: '{}' }
     })
-    expect(w.post({ k: 'family-key-123', op: 'update' })).toEqual({ ok: true, v: 5 })
+    expect(w.post({ k: 'family-key-123', op: 'update' })).toEqual({ ok: true, v: 6 })
     expect(calls).toContain('PUT /v1/projects/script1/content')
     expect(calls).toContain('PUT /v1/projects/script1/deployments/web1')
     expect(w.props.DEPLOYMENT_ID).toBe('web1')
@@ -163,9 +167,11 @@ describe('family script', () => {
     expect(res.scan).toMatchObject({ added: 1, trips: 1 })
     w.post({ k: 'family-key-123', op: 'dismiss', id: res.found[0].id })
     expect(w.post({ k: 'family-key-123', op: 'sync', since: 0, put: [] }).found).toEqual([])
-    // Next hour: the same emails aren't read again.
+    // Next hour: the same emails aren't read again (remembered in the Sheet, which has no 9 KB limit).
     w.tick()
     w.ctx.scan()
     expect(geminiCalls).toBe(1)
+    expect(JSON.parse(w.tabs.state.find((r: any[]) => r[0] === 'SEEN')[1])).toEqual(['t1', 't2', 't3'])
+    expect(w.props.SEEN).toBeUndefined()
   })
 })

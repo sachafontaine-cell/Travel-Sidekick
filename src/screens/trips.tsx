@@ -1,4 +1,6 @@
+import { useEffect } from 'preact/hooks'
 import { Crest, Icon } from '../ui'
+import { save } from '../lib/data'
 import { EmailCheck } from './email'
 import { connected, dismissFound, syncState } from '../lib/sync'
 import { addFound } from '../lib/found'
@@ -16,7 +18,14 @@ function where(t: Trip) {
   return n.day < 1 ? 'upcoming' : n.day > tripDays(t) ? 'past' : 'now'
 }
 
+/** "+ New trip" pressed, then left without a destination or dates: tidy those away. */
+function tidyDrafts() {
+  const old = Object.values(trips.get()).filter((t) => !t.dest.name && !t.start && Date.now() - t.at > 5 * 60000)
+  if (old.length) save('trip', [], undefined, old.map((t) => t.id))
+}
+
 export function Trips() {
+  useEffect(tidyDrafts, [])
   const all = Object.values(trips.use()).sort((a, b) => (a.start || '9') < (b.start || '9') ? -1 : 1)
   const now = all.filter((t) => where(t) === 'now')
   const soon = all.filter((t) => where(t) === 'upcoming')

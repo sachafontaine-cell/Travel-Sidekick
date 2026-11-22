@@ -2,7 +2,7 @@
 // Times are never stored: they are worked out from the order, bookings, opening hours, meals,
 // downtime and walking, every time something changes.
 import type { DayMeta, Place, Trip } from './model'
-import { leg, miles, type Leg, type Point } from './geo'
+import { km, leg, miles, type Leg, type Point } from './geo'
 import { addDays, clock, daysBetween, weekday, WEEKDAY_LONG } from './time'
 import { groupLimit, youngKids } from './people'
 
@@ -35,6 +35,8 @@ export interface DayPlan {
 export const LUNCH: [number, number] = [11 * 60 + 30, 14 * 60 + 30]
 export const DINNER_FROM = 18 * 60 + 30
 const LUNCH_MIN = 45
+/** Farther than this from the destination = not part of the day's walking (e.g. the flight from home). */
+const FAR_KM = 80
 
 export const tripDays = (t: Pick<Trip, 'start' | 'end'>) => daysBetween(t.start, t.end) + 1
 export const dateOf = (t: Pick<Trip, 'start'>, day: number) => addDays(t.start, day - 1)
@@ -71,7 +73,7 @@ export function planDay(trip: Trip, day: number, all: Place[], meta?: DayMeta): 
   let walkKm = 0
   let cursor = trip.dayStart
   // A booking before the usual start pulls the day earlier.
-  if (list[0]?.fixed != null) cursor = Math.min(cursor, list[0].fixed - leg(pos, list[0], kids).minutes)
+  if (list[0]?.fixed != null) cursor = Math.min(cursor, list[0].fixed - (trip.dest.lat !== 0 && km(trip.dest, list[0]) > FAR_KM ? 0 : leg(pos, list[0], kids).minutes))
 
   let lunchDone = false
   const wantDowntime = trip.downtime.on && trip.downtime.minutes > 0
@@ -102,10 +104,14 @@ export function planDay(trip: Trip, day: number, all: Place[], meta?: DayMeta): 
 
   if (after === '^' && wantDowntime && list.length) addDowntime()
 
+  // Far from the destination (the flight from home, a hotel booked elsewhere): it keeps its time
+  // on the day, but adds no travel or walking and doesn't move where you are.
+  const far = (p: Point) => trip.dest.lat !== 0 && km(trip.dest, p) > FAR_KM
   for (const p of list) {
     // No meal coming and it's lunchtime: keep a lunch break before going on.
     if (!lunchDone && p.kind !== 'meal' && cursor >= 12 * 60 + 15 && cursor < LUNCH[1]) addLunch()
-    const travel = leg(pos, p, kids)
+    const away = far(p)
+    const travel = away ? { minutes: 0, walkKm: 0, mode: 'walk' as const } : leg(pos, p, kids)
     const arrive = cursor + travel.minutes
     let start = arrive
     let warn: string | undefined
@@ -128,7 +134,7 @@ export function planDay(trip: Trip, day: number, all: Place[], meta?: DayMeta): 
     const wait = Math.max(0, start - arrive)
     slots.push({ kind: 'place', id: p.id, place: p, start, end: start + p.minutes, travel, warn, wait: wait || undefined })
     walkKm += travel.walkKm
-    pos = p
+    if (!away) pos = p
     cursor = start + p.minutes
     if (p.kind === 'meal' && start >= LUNCH[0] && start < LUNCH[1]) lunchDone = true
     maybeDowntime(p.id)

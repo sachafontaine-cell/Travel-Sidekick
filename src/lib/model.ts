@@ -65,6 +65,8 @@ export interface Place {
   /** A booked time (minutes) that the planner never moves. */
   fixed?: number | null
   booked?: string
+  /** A booking from email that has been placed into its day once (never moved again by the app). */
+  slotted?: boolean
   done?: boolean
   /** Being scored by Gemini right now (added by hand). */
   scoring?: boolean

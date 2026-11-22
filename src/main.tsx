@@ -7,7 +7,7 @@ import { demoTrip } from './lib/demo'
 import { go, overlays, route, tripPath } from './lib/nav'
 import { Plan } from './screens/plan'
 import { startUpdates, setHomeCheck } from './lib/update'
-import { startSync } from './lib/sync'
+import { cursor, startSync } from './lib/sync'
 import { startBackground } from './lib/background'
 
 // The sample trip lives in its own space and always starts fresh.
@@ -25,6 +25,8 @@ const q = new URLSearchParams(location.search)
 export const validApi = (u: string | null) => !!u && /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u.trim())
 if (q.get('k')) {
   const api = q.get('api')
+  // A different family script (another Sheet): start syncing from the beginning.
+  if (validApi(api) && api!.trim() !== settings.get().api) { cursor.set(0); settings.set({ ...settings.get(), keyShared: false }) }
   settings.set({ ...settings.get(), familyKey: q.get('k')!, api: validApi(api) ? api!.trim() : settings.get().api, badApi: api && !validApi(api) ? api.slice(0, 40) : undefined })
   q.delete('k'); q.delete('api')
   history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash)

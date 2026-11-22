@@ -95,7 +95,8 @@ export function Today({ trip }: { trip: Trip }) {
 
   const plan = plansFor(trip)[now.day - 1]
   const slots = plan?.slots ?? []
-  const asked = slots.filter((x) => x.place && x.end <= now.min && !x.place.done && x.place.status !== 'out')
+  // "Done?" is for things you choose to do; bookings (flights, tickets) just happen.
+  const asked = slots.filter((x) => x.place && !x.place.booked && x.end <= now.min && !x.place.done && x.place.status !== 'out')
   const next = slots.find((x) => x.end > now.min)
   const energy: Energy = s.energy?.date === now.date ? s.energy.level : 'ok'
   const gap = gapNow(trip, plan, now.min)

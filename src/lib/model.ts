@@ -103,6 +103,8 @@ export interface Trip {
   home: string
   /** 1 unit of destination currency in home currency. */
   fx?: { rate: number; at: number }
+  /** Found by the family script in booking emails (not created by hand). */
+  found?: 'email'
   /** The list was built (first run done). */
   built?: boolean
   /** Before-you-go checklist ticks. */

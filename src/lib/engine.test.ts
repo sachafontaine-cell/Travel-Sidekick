@@ -4,7 +4,7 @@ import { minus, plus } from './vibes'
 import { demoTrip } from './demo'
 import { planAll, planDay, dayIndex, tripDays } from './planner'
 import { countdown, mustInfo } from './musts'
-import { rebalance } from './rebalance'
+import { rebalance, slotBookings } from './rebalance'
 import { gapNow, ideas } from './whatnow'
 import { groupLimit, suggestedMiles } from './people'
 import { clock, weekday } from './time'
@@ -118,5 +118,20 @@ describe('must-sees, rebalance and what now', () => {
     expect(gap.next?.place?.name).toBe('Lunch · Le Fumoir')
     const list = ideas(trip, places, '2026-06-14', 11 * 60 + 40, gap, 'tired')
     expect(list[0]?.place.name).toBe('Tuileries Garden')
+  })
+})
+
+describe('bookings from email', () => {
+  it('a dinner booking that arrives first in the list is slotted at dinner time, nothing else moves', () => {
+    const { trip, places } = demoTrip()
+    const dinner = { ...places.find((p) => p.name.startsWith('Dinner'))!, id: 'mail-1', day: 5, dayRank: 'a1ati', fixed: 19 * 60, booked: 'Booked · from your email' }
+    const all = [...places, dinner]
+    const moved = slotBookings(trip, all)
+    expect(moved.map((p) => p.id)).toEqual(['mail-1'])
+    const after = all.map((p) => moved.find((m) => m.id === p.id) ?? p)
+    const plan = planDay(trip, 5, after)
+    expect(plan.slots.filter((s) => s.place).map((s) => s.place!.name).at(-1)).toBe(dinner.name)
+    expect(plan.slots.find((s) => s.place?.name === 'Montmartre + Sacré-Cœur')!.start).toBeLessThan(12 * 60)
+    expect(plan.slots.find((s) => s.id === 'mail-1')!.warn).toBeUndefined()
   })
 })

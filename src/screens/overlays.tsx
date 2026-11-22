@@ -6,7 +6,6 @@ import { Card } from './card'
 import { Ask } from './ask'
 import { Rebalance } from './rebalance'
 import { AppSheet } from './settings'
-import { FoundSheet } from './trips'
 import { AddSheet, DaySheet, FilterSheet, MenuSheet, RulesSheet } from './sheets'
 import { SETUP_SHEETS } from './setup'
 
@@ -18,7 +17,6 @@ export function Overlays({ trip }: { trip?: Trip }) {
     <>
       {list.map((o) => {
         if (o.kind === 'sheet' && o.name === 'app') return <AppSheet />
-        if (o.kind === 'sheet' && o.name === 'found') return <FoundSheet />
         if (o.kind === 'sheet' && SETUP_SHEETS[o.name] && o.arg) { const S = SETUP_SHEETS[o.name]; return <S id={o.arg} /> }
         if (!t) return null
         if (o.kind === 'card') return <Card trip={t} id={o.place} />

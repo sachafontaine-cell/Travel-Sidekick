@@ -5,24 +5,11 @@ import { save, settings, trips, tripPlaces } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
 import { buildList, scorePlace } from '../lib/ai'
 import { autoPlan } from '../lib/rebalance'
-import { fetchBookings, connected, type Booking } from '../lib/sync'
+import { connected, scanEmail } from '../lib/sync'
 import { between } from '../lib/rank'
-import { parseClock } from '../lib/time'
-import { dayIndex } from '../lib/planner'
 import type { Place, Trip } from '../lib/model'
 
 type Step = { text: string; done: boolean }
-
-export function bookingPlace(b: Booking, trip: Trip, rank: string): Place | null {
-  const day = dayIndex(trip, b.date)
-  const time = b.time ? parseClock(b.time) : null
-  if (b.kind === 'hotel' || day < 1 || day > 99 || time == null || b.lat == null || b.lng == null) return null
-  return {
-    id: crypto.randomUUID(), trip: trip.id, name: b.name, kind: b.kind === 'meal' ? 'meal' : 'other', lat: b.lat, lng: b.lng, badge: 'worth', must: false,
-    worth: 7, value: 7, sub: { iconic: 5, vibe: 5, hassle: 5, kid: 5 }, rec: 'pay', recText: 'Already booked.', why: b.note ?? '', tip: '',
-    price: 0, minutes: b.kind === 'flight' ? 60 : 90, suggested: 90, indoor: true, status: 'picked', rank, day, dayRank: 'a', fixed: time, booked: 'Booked · from your email', at: Date.now(),
-  }
-}
 
 export function Start({ trip }: { trip: Trip }) {
   const s = settings.use()
@@ -45,18 +32,9 @@ export function Start({ trip }: { trip: Trip }) {
     try {
       let i = 0
       if (connected()) {
-        step(i, 'Reading bookings from your email…')
-        try {
-          const bookings = await fetchBookings(trip.dest.name, trip.start, trip.end)
-          let rank: string | undefined
-          for (const b of bookings) {
-            if (b.kind === 'hotel' && b.lat != null && b.lng != null && !base) base = { name: b.name, lat: b.lat, lng: b.lng }
-            rank = between(rank, undefined)
-            const p = bookingPlace(b, trip, 'a' + rank)
-            if (p) { all.push(p); names.add(p.name.toLowerCase()) }
-          }
-          step(i, `Read ${bookings.length} booking${bookings.length === 1 ? '' : 's'} from your email`, true)
-        } catch (e) { step(i, `Could not read your email (${e instanceof Error ? e.message : 'unknown error'}). Skipped; try again from the Trip tab.`, true) }
+        // Email is read by the family script in the background: nothing here waits for it.
+        void scanEmail().catch(() => {})
+        step(i, 'Bookings from your email: added in the background as they are found', true)
         i++
       }
       step(i, 'Finding places for your family…')

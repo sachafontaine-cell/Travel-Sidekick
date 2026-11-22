@@ -3,12 +3,15 @@
 // minute while open. The newest change wins, per place / day / trip.
 import { createStore, DEMO } from './store'
 import { merge, outbox, settings, whenChanged, type Rec } from './data'
+import { afterMerge } from './found'
 
 /** The script version this app needs; an older script is asked to update itself. */
-export const SCRIPT_NEEDED = 2
+export const SCRIPT_NEEDED = 3
 
 export const cursor = createStore<number>(0, 'cursor')
-export const syncState = createStore<{ at?: number; error?: string; script?: number }>({})
+/** The script's last email check: when, what it added, or why it failed. */
+export interface Scan { at: number; added?: number; trips?: number; error?: string }
+export const syncState = createStore<{ at?: number; error?: string; script?: number; scan?: Scan | null; asked?: number }>({}, 'sync-state')
 
 /** The family key from the link, or the Control Center's on this phone (same web address). */
 export function familyKey(): string {
@@ -42,12 +45,13 @@ export async function syncNow(): Promise<void> {
   try {
     const sending = outbox.get()
     const s = settings.get()
-    const res = await call<{ now: number; recs: Rec[]; v: number; gk?: string }>({ op: 'sync', since: cursor.get(), put: sending, me: s.me ?? '', wantKey: !s.geminiKey, app: __VERSION__ })
+    const res = await call<{ now: number; recs: Rec[]; v: number; gk?: string; scan?: Scan | null }>({ op: 'sync', since: cursor.get(), put: sending, me: s.me ?? '', wantKey: !s.geminiKey, app: __VERSION__ })
     outbox.set((o) => o.filter((r) => !sending.some((x) => x.coll === r.coll && x.id === r.id && x.at === r.at)))
     merge(res.recs ?? [])
+    afterMerge(res.recs ?? [])
     cursor.set(res.now)
     if (res.gk && !settings.get().geminiKey) settings.set({ ...settings.get(), geminiKey: res.gk })
-    syncState.set({ at: Date.now(), script: res.v })
+    syncState.set({ ...syncState.get(), at: Date.now(), script: res.v, scan: res.scan ?? null, error: undefined })
     // A key saved before the script was connected: hand it over now (the script reads bookings with it).
     const k = settings.get()
     if (k.geminiKey && !k.keyShared) void shareKey(k.geminiKey)
@@ -70,11 +74,16 @@ export async function shareKey(gk: string): Promise<boolean> {
 }
 export const setAlerts = (emails: string[]) => call({ op: 'setAlerts', emails })
 export const setKayak = (url: string) => call({ op: 'setKayak', url })
-export interface FoundTrip { destination: string; start: string; end: string; bookings: Booking[] }
-/** Trips happening now or coming up, from booking emails and the KAYAK calendar (script v2+). */
-export async function findTrips(): Promise<FoundTrip[]> {
-  const j = await call<{ trips?: FoundTrip[]; error?: string }>({ op: 'trips' }, 120000)
-  return Array.isArray(j.trips) ? j.trips : []
+/**
+ * Asks the script to read new booking emails (and the KAYAK calendar) in the background. Nothing
+ * waits: new bookings and trips arrive with the next syncs (checked again after 1 and 2.5 minutes).
+ */
+export async function scanEmail(): Promise<void> {
+  if (!connected()) return
+  await call({ op: 'scan' }, 30000)
+  syncState.set({ ...syncState.get(), asked: Date.now() })
+  setTimeout(() => void syncNow(), 75000)
+  setTimeout(() => void syncNow(), 150000)
 }
 
 export function startSync() {
@@ -87,10 +96,3 @@ export function startSync() {
   void syncNow()
 }
 
-export interface Booking { name: string; kind: 'flight' | 'hotel' | 'ticket' | 'meal' | 'other'; date: string; time?: string; lat?: number; lng?: number; note?: string }
-/** Bookings found in the family inbox for these dates and place (read by the script). */
-export async function fetchBookings(dest: string, start: string, end: string): Promise<Booking[]> {
-  if (!connected()) return []
-  const j = await call<{ bookings?: Booking[] }>({ op: 'bookings', dest, start, end }, 90000)
-  return Array.isArray(j.bookings) ? j.bookings : []
-}

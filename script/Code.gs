@@ -6,13 +6,13 @@
 // What it does:
 //   sync       both phones send and fetch changes (newest change wins, per record)
 //   setKey     keeps the Gemini key so the other phone gets it automatically
-//   trips      finds trips happening now or coming up in booking emails and the KAYAK calendar
-//   bookings   reads booking confirmations (Gmail + KAYAK calendar) for the trip dates (cleaned before Gemini)
+//   scan       every hour and on request, in the background: new booking emails + the KAYAK
+//              calendar become bookings in their trip, or a new trip (cleaned before Gemini)
 //   hourly     7:00 destination time: checks must-see hours with Google, emails if one is closed
 //              3 days before a trip: emails "download the language in Google Translate"
 //   nightly    updates this script from the repository when a newer version is published
 
-var VERSION = 2
+var VERSION = 3
 var REPO_RAW = 'https://raw.githubusercontent.com/sachafontaine-cell/Travel-Sidekick/main/script/'
 var APP_URL = 'https://sachafontaine-cell.github.io/Travel-Sidekick/'
 
@@ -54,10 +54,11 @@ function doPost(e) {
       var u = String(body.url || '').trim()
       if (u && !/^(https|webcal):\/\//.test(u)) return out({ error: 'That is not a calendar link.' })
       props.setProperty('KAYAK_ICS', u.replace(/^webcal:/, 'https:'))
+      props.deleteProperty('KAYAK_SEEN')
+      requestScan()
       return out({ ok: true })
     }
-    if (body.op === 'trips') return out({ trips: findTrips() })
-    if (body.op === 'bookings') return out({ bookings: bookings(String(body.dest || ''), String(body.start || ''), String(body.end || '')) })
+    if (body.op === 'scan') { requestScan(); return out({ ok: true }) }
     if (body.op === 'update') return out(selfUpdate())
     if (body.op === 'ping') return out({ v: VERSION })
     return out({ error: 'Unknown request' })
@@ -115,6 +116,7 @@ function putRecords(puts, since) {
 function sync(body) {
   var res = putRecords(body.put, body.since)
   res.v = VERSION
+  res.scan = JSON.parse(PropertiesService.getScriptProperties().getProperty('SCAN') || 'null')
   if (body.wantKey) {
     var gk = PropertiesService.getScriptProperties().getProperty('GEMINI_KEY')
     if (gk) res.gk = gk
@@ -132,9 +134,10 @@ function gemini(prompt, opts) {
   var key = PropertiesService.getScriptProperties().getProperty('GEMINI_KEY')
   if (!key) throw new Error('No Gemini key yet: add it in the app (Trips > This app).')
   var models = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest']
-  var payload = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0 } }
-  if (opts && opts.search) payload.tools = [{ google_search: {} }]
   for (var i = 0; i < models.length; i++) {
+    // Quick answers: no slow hidden "thinking".
+    var payload = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0, thinkingConfig: /2\.5/.test(models[i]) ? { thinkingBudget: 0 } : { thinkingLevel: 'low' } } }
+    if (opts && opts.search) payload.tools = [{ google_search: {} }]
     var r = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + models[i] + ':generateContent?key=' + encodeURIComponent(key), {
       method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true,
     })
@@ -143,6 +146,16 @@ function gemini(prompt, opts) {
       var j = JSON.parse(r.getContentText())
       var parts = (((j.candidates || [])[0] || {}).content || {}).parts || []
       return parts.filter(function (p) { return typeof p.text === 'string' && !p.thought }).map(function (p) { return p.text }).join('')
+    }
+    if (code === 400 && /think/i.test(r.getContentText())) {
+      delete payload.generationConfig.thinkingConfig
+      r = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + models[i] + ':generateContent?key=' + encodeURIComponent(key), { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true })
+      code = r.getResponseCode()
+      if (code === 200) {
+        var j2 = JSON.parse(r.getContentText())
+        var parts2 = (((j2.candidates || [])[0] || {}).content || {}).parts || []
+        return parts2.filter(function (p) { return typeof p.text === 'string' && !p.thought }).map(function (p) { return p.text }).join('')
+      }
     }
     if (code !== 429 && code !== 404 && code < 500) throw new Error('Gemini error ' + code)
     Utilities.sleep(1500)
@@ -169,18 +182,17 @@ function redact(text) {
     .replace(/\+?\d[\d ().-]{8,}\d/g, '[phone]')
 }
 
-/** Recent booking emails (last message of each thread), cleaned. `keep` filters by body. */
-function bookingTexts(keep, max) {
-  var query = '(confirmation OR confirmed OR reservation OR booking OR itinerary OR ticket OR e-ticket) newer_than:1y'
-  var texts = []
-  GmailApp.search(query, 0, 50).forEach(function (th) {
-    th.getMessages().slice(-1).forEach(function (m) {
-      var body = m.getPlainBody() || ''
-      if (keep && !keep(body)) return
-      texts.push('Subject: ' + m.getSubject() + ' | Date: ' + Utilities.formatDate(m.getDate(), 'UTC', 'yyyy-MM-dd') + '\n' + redact(body.slice(0, max || 2500)))
-    })
+/** Booking emails not read yet (remembered by thread), fetched in one batch. */
+function newBookingMail() {
+  var seen = JSON.parse(PropertiesService.getScriptProperties().getProperty('SEEN') || '[]')
+  var query = '(confirmation OR confirmed OR reservation OR booking OR itinerary OR "e-ticket" OR "check-in" OR "your trip") newer_than:180d'
+  var threads = GmailApp.search(query, 0, 80).filter(function (t) { return seen.indexOf(t.getId()) < 0 }).slice(0, 25)
+  if (!threads.length) return { texts: [], ids: [] }
+  var texts = GmailApp.getMessagesForThreads(threads).map(function (list) {
+    var m = list[list.length - 1]
+    return 'Subject: ' + m.getSubject() + ' | Sent: ' + Utilities.formatDate(m.getDate(), 'UTC', 'yyyy-MM-dd') + '\n' + redact((m.getPlainBody() || '').slice(0, 1800))
   })
-  return texts
+  return { texts: texts, ids: threads.map(function (t) { return t.getId() }) }
 }
 
 /** Events from the KAYAK Trips calendar link (if saved): flights, hotels, reservations. */
@@ -194,52 +206,136 @@ function kayakEvents() {
   text.split('BEGIN:VEVENT').slice(1).forEach(function (block) {
     var get = function (k) { var m = new RegExp('^' + k + '[^:\\n]*:(.*)$', 'm').exec(block); return m ? m[1].trim().replace(/\\,/g, ',').replace(/\\n/g, ' ') : '' }
     var day = function (v) { var m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/.exec(v); return m ? { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] ? m[4] + ':' + m[5] : '' } : null }
-    var s = day(get('DTSTART')), e = day(get('DTEND'))
-    if (s) events.push({ summary: get('SUMMARY'), location: get('LOCATION'), start: s.date, time: s.time, end: e ? e.date : s.date, note: get('DESCRIPTION').slice(0, 200) })
+    var st = day(get('DTSTART')), en = day(get('DTEND'))
+    if (st) events.push({ summary: get('SUMMARY'), location: get('LOCATION'), start: st.date, time: st.time, end: en ? en.date : st.date, note: get('DESCRIPTION').slice(0, 200) })
   })
   return events
 }
 
-var BOOKING_SHAPE = '{"name":"short name, e.g. Louvre tickets or Flight to Paris","kind":"flight|hotel|ticket|meal|other","date":"YYYY-MM-DD","time":"HH:MM local","address":"street address or venue/airport name","note":"max 60 chars, no numbers"}'
+var BOOKING_SHAPE = '{"name":"short name, e.g. Louvre tickets or Flight to Paris","kind":"flight|hotel|ticket|meal|other","date":"YYYY-MM-DD","time":"HH:MM local or empty","address":"street address, venue or airport name","note":"max 60 chars, no numbers"}'
 
-function geocodeAll(list, dest) {
-  var geo = Maps.newGeocoder()
-  return list.filter(function (b) { return b && b.name && b.date }).slice(0, 25).map(function (b) {
-    var lat = null, lng = null
-    try {
-      var g = geo.geocode((b.address || b.name) + (dest ? ', ' + dest : ''))
-      if (g.status === 'OK' && g.results.length) { lat = g.results[0].geometry.location.lat; lng = g.results[0].geometry.location.lng }
-    } catch (e) { /* no location: the app skips it */ }
-    return { name: String(b.name).slice(0, 60), kind: b.kind, date: b.date, time: b.time, lat: lat, lng: lng, note: b.note }
-  })
+function geocode(q, near) {
+  var cache = CacheService.getScriptCache(), k = 'geo:' + (q + '|' + near).slice(0, 200)
+  var hit = cache.get(k)
+  if (hit) return JSON.parse(hit)
+  var loc = null
+  try {
+    var g = Maps.newGeocoder().geocode(q + (near ? ', ' + near : ''))
+    if (g.status === 'OK' && g.results.length) loc = { lat: g.results[0].geometry.location.lat, lng: g.results[0].geometry.location.lng }
+  } catch (e) { /* unknown place */ }
+  cache.put(k, JSON.stringify(loc), 21600)
+  return loc
 }
 
-/** Bookings for one trip: booking emails + the KAYAK calendar, inside the dates. */
-function bookings(dest, start, end) {
-  if (!dest || !start || !end) return []
-  var city = dest.split(',')[0].trim()
-  var texts = bookingTexts(function (body) { return body.indexOf(city) >= 0 || body.indexOf(start) >= 0 })
-  var events = kayakEvents().filter(function (e) { return e.end >= start && e.start <= end })
-  if (!texts.length && !events.length) return []
-  var prompt = 'From these booking emails and calendar events, list the bookings for a trip to ' + dest + ' from ' + start + ' to ' + end + '.\n' +
-    'Only bookings inside those dates. Reply with only a JSON array: [' + BOOKING_SHAPE + ']\n\n' +
-    (events.length ? 'KAYAK calendar:\n' + JSON.stringify(events) + '\n\n' : '') + texts.slice(0, 15).join('\n\n---\n\n')
-  return geocodeAll(jsonIn(gemini(prompt)), dest)
+/** A city with its time zone and country (Open-Meteo, free). */
+function findCity(name) {
+  var r = UrlFetchApp.fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&format=json&name=' + encodeURIComponent(name.split(',')[0]), { muteHttpExceptions: true })
+  var c = r.getResponseCode() === 200 ? (JSON.parse(r.getContentText()).results || [])[0] : null
+  if (c) return { name: [c.name, c.admin1 && c.admin1 !== c.name ? c.admin1 : '', c.country].filter(String).join(', '), lat: c.latitude, lng: c.longitude, tz: c.timezone, country: c.country_code, currency: '', lang: '' }
+  var loc = geocode(name, '')
+  return loc ? { name: name, lat: loc.lat, lng: loc.lng, tz: 'UTC', country: '', currency: '', lang: '' } : null
 }
 
-/** Trips happening now or coming up, found in booking emails and the KAYAK calendar. */
-function findTrips() {
+function newTripRecord(g, now) {
+  var dest = findCity(g.destination)
+  if (!dest) return null
+  return {
+    id: Utilities.getUuid(), name: dest.name.split(',')[0], dest: dest, start: g.start, end: g.end, vibes: {}, budget: { all: 2 }, pace: 'balanced', people: [],
+    dayStart: 540, dayEnd: 1260, downtime: { on: true, minutes: 90 }, food: '', nos: [], home: 'USD', found: 'email', at: now, by: 'Email',
+  }
+}
+
+function dayNumber(trip, date) {
+  var ms = function (d) { return Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) }
+  return Math.round((ms(date) - ms(trip.start)) / 86400000) + 1
+}
+
+function bookingRecord(b, trip, loc, now) {
+  var m = /^(\d{1,2}):(\d{2})/.exec(b.time || '')
+  var fixed = m ? +m[1] * 60 + +m[2] : null
+  return {
+    id: Utilities.getUuid(), trip: trip.id, name: String(b.name).slice(0, 60), kind: b.kind === 'meal' ? 'meal' : 'other', lat: loc.lat, lng: loc.lng,
+    badge: 'worth', must: false, worth: 7, value: 7, sub: { iconic: 5, vibe: 5, hassle: 5, kid: 5 }, rec: 'pay', recText: 'Already booked.', why: String(b.note || ''), tip: '',
+    price: 0, minutes: b.kind === 'flight' ? 60 : 90, suggested: 90, indoor: true, status: 'picked', rank: 'a' + (1000 + (fixed || 0)).toString(36) + 'i',
+    day: dayNumber(trip, b.date), dayRank: 'a' + (1000 + (fixed || 0)).toString(36) + 'i', fixed: fixed, booked: 'Booked · from your email', at: now, by: 'Email',
+  }
+}
+
+/** A trip whose dates touch these dates (a family is on one trip at a time). */
+function overlapping(trips, start, end) {
+  return trips.filter(function (t) { return t.start && t.end && !(end < addDays(t.start, -1) || start > addDays(t.end, 1)) })[0] || null
+}
+
+/**
+ * Reads new booking emails and the KAYAK calendar, then adds each booking to its trip, or creates
+ * the trip ("Found in your email") when none covers those dates. Runs every hour and on request,
+ * in the background: the phones never wait for it; results arrive with the next sync.
+ */
+function scan() {
+  var props = PropertiesService.getScriptProperties()
+  var now = Date.now()
   var today = Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd')
-  var events = kayakEvents().filter(function (e) { return e.end >= today })
-  var texts = bookingTexts(null, 1500)
-  if (!texts.length && !events.length) return []
-  var prompt = 'Today is ' + today + '. From these booking emails and calendar events, find the trips that are happening now or coming up (ignore past trips).\n' +
-    'Group bookings into trips by destination and dates. A trip is the main destination city (not the home airport).\n' +
-    'Reply with only a JSON array: [{"destination":"City, Country","start":"YYYY-MM-DD","end":"YYYY-MM-DD","bookings":[' + BOOKING_SHAPE + ']}]\n\n' +
-    (events.length ? 'KAYAK calendar:\n' + JSON.stringify(events) + '\n\n' : '') + texts.slice(0, 25).join('\n\n---\n\n')
-  return jsonIn(gemini(prompt)).filter(function (t) { return t && t.destination && t.start && t.end && t.end >= today }).slice(0, 6).map(function (t) {
-    return { destination: String(t.destination), start: t.start, end: t.end, bookings: geocodeAll(t.bookings || [], t.destination) }
-  })
+  try {
+    var mail = newBookingMail()
+    var kSeen = JSON.parse(props.getProperty('KAYAK_SEEN') || '[]')
+    var events = kayakEvents().filter(function (e) { return e.end >= today && kSeen.indexOf(e.summary + '|' + e.start) < 0 })
+    if (!mail.texts.length && !events.length) { props.setProperty('SCAN', JSON.stringify({ at: now, added: 0, trips: 0 })); return { added: 0, trips: 0 } }
+    var trips = allRecords('trip')
+    var known = trips.filter(function (t) { return t.start && t.end }).map(function (t) { return { id: t.id, destination: t.dest && t.dest.name, start: t.start, end: t.end } })
+    var prompt = 'Today is ' + today + '. Extract the travel bookings (flights, hotels, tickets, restaurant reservations) from these emails and calendar events. Ignore anything that ended before today and anything that is not a booking.\n' +
+      'Group them by trip. If a booking falls within an existing trip\'s dates, use its id. Otherwise group it into a new trip (destination city = where they stay, not the home airport).\n' +
+      'Existing trips: ' + JSON.stringify(known) + '\n' +
+      'Reply with only a JSON array: [{"trip":"existing trip id or null","destination":"City, Country","start":"YYYY-MM-DD","end":"YYYY-MM-DD","bookings":[' + BOOKING_SHAPE + ']}]\n\n' +
+      (events.length ? 'KAYAK calendar:\n' + JSON.stringify(events) + '\n\n' : '') + mail.texts.join('\n\n---\n\n')
+    var groups = jsonIn(gemini(prompt))
+    var places = allRecords('place')
+    var puts = {}, added = 0, newTrips = 0
+    var put = function (coll, d) { puts[coll + ':' + d.id] = { coll: coll, id: d.id, at: d.at, data: d } }
+    groups.forEach(function (g) {
+      if (!g || !g.start || !g.end) return
+      var trip = trips.filter(function (t) { return t.id === g.trip })[0] || overlapping(trips, g.start, g.end)
+      if (!trip) {
+        if (g.end < today || !g.destination) return
+        trip = newTripRecord(g, now)
+        if (!trip) return
+        trips.push(trip); put('trip', trip); newTrips++
+      }
+      ;(g.bookings || []).forEach(function (b) {
+        if (!b || !b.name || !b.date || b.date < addDays(trip.start, -1) || b.date > trip.end) return
+        var loc = geocode(b.address || b.name, trip.dest && trip.dest.name)
+        if (b.kind === 'hotel') {
+          if (!trip.base && loc) { trip.base = { name: String(b.name).slice(0, 60), lat: loc.lat, lng: loc.lng }; trip.at = now; put('trip', trip) }
+          return
+        }
+        if (!loc || b.date < trip.start) return
+        var name = String(b.name).slice(0, 60).toLowerCase()
+        var day = dayNumber(trip, b.date)
+        if (places.some(function (p) { return p.trip === trip.id && p.name.toLowerCase() === name && p.day === day })) return
+        var rec = bookingRecord(b, trip, loc, now)
+        places.push(rec); put('place', rec); added++
+      })
+    })
+    var list = Object.keys(puts).map(function (k) { return puts[k] })
+    if (list.length) putRecords(list, now)
+    var seen = JSON.parse(props.getProperty('SEEN') || '[]').concat(mail.ids)
+    props.setProperty('SEEN', JSON.stringify(seen.slice(-800)))
+    props.setProperty('KAYAK_SEEN', JSON.stringify(kSeen.concat(events.map(function (e) { return e.summary + '|' + e.start })).slice(-400)))
+    props.setProperty('SCAN', JSON.stringify({ at: now, added: added, trips: newTrips }))
+    return { added: added, trips: newTrips }
+  } catch (e) {
+    props.setProperty('SCAN', JSON.stringify({ at: now, error: String(e && e.message || e) }))
+    throw e
+  }
+}
+
+/** Runs a scan in about a minute, without making the phone wait. */
+function requestScan() {
+  var waiting = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'scanNow' })
+  if (!waiting) ScriptApp.newTrigger('scanNow').timeBased().after(1000).create()
+}
+function scanNow() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'scanNow') ScriptApp.deleteTrigger(t) })
+  try { scan() } catch (e) { console.error('Scan failed: ' + e) }
 }
 
 // ---------- Timed jobs ----------
@@ -270,6 +366,7 @@ function addDays(d, n) {
 var WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 function hourly() {
+  try { scan() } catch (e) { console.error('Scan failed: ' + e) }
   var trips = allRecords('trip')
   if (!trips.length) return
   var places = allRecords('place')

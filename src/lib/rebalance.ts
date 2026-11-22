@@ -160,3 +160,28 @@ export function rebalance(trip: Trip, all: Place[], metas: Record<string, DayMet
   }
   return { changes, places: changed, note: notes.join(' ') || undefined }
 }
+
+/**
+ * Bookings that arrived from email (rank starting with "a", set by the family script) are slotted
+ * once into the best spot of their day: where you arrive in time, with the fewest problems.
+ * The order you chose for everything else stays as it is. Returns the bookings it moved.
+ */
+export function slotBookings(trip: Trip, all: Place[], metas: Record<string, DayMeta> = {}): Place[] {
+  const work = all.map((p) => ({ ...p }))
+  const moved: Place[] = []
+  const fresh = work.filter((p) => p.booked && p.day != null && p.fixed != null && (p.dayRank ?? '').startsWith('a') && (p.dayRank ?? '').endsWith('i'))
+  for (const p of fresh.sort((a, b) => (a.fixed ?? 0) - (b.fixed ?? 0))) {
+    const others = dayPlaces(work, p.day!).filter((x) => x.id !== p.id)
+    let best: { rank: string; cost: number } | null = null
+    for (let i = 0; i <= others.length; i++) {
+      p.dayRank = between(others[i - 1]?.dayRank, others[i]?.dayRank)
+      const plan = planDay(trip, p.day!, work, metas[`${trip.id}:${p.day}`])
+      const slot = plan.slots.find((s) => s.id === p.id)
+      if (!slot) continue
+      const cost = (slot.warn ? 1000 : 0) + plan.issues.length * 100 + (slot.wait ?? 0) + (plan.late ? 50 : 0)
+      if (!best || cost < best.cost) best = { rank: p.dayRank, cost }
+    }
+    if (best) { p.dayRank = best.rank; moved.push(p) }
+  }
+  return moved
+}

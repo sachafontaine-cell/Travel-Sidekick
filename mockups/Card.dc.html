@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Activity Card – Eiffel Tower</title>
+<title>Activity Card (dialog) – Eiffel Tower</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -14,12 +14,88 @@ body{margin:0}
 a{color:#14213D}a:hover{color:#7A5600}
 </style>
 </helmet>
-<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F7F3EA; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #14213D; padding: 52px 20px 24px; display: flex; flex-direction: column; gap: 12px; position: relative">
-<div style="display: flex; align-items: center; justify-content: space-between">
-<a href="List.dc.html" aria-label="Back to list" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 22px; background: #FFFFFF; border: 1px solid #E0D8C6; color: #14213D; text-decoration: none; font-size: 20px">‹</a>
-<span style="padding: 6px 12px; border-radius: 8px; background: #14213D; color: #E7C46A; font-size: 14px; font-weight: 700">Must-See</span>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: #F7F3EA; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #14213D">
+<div aria-hidden="true" style="position: absolute; inset: 0; width: 390px; height: 844px; box-sizing: border-box; background: #F7F3EA; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #14213D; padding: 56px 16px 100px; display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden"><div style="display: flex; justify-content: space-between; align-items: center">
+<h1 style="margin: 0; font-family: 'DM Serif Display', Georgia, serif; font-size: 30px; font-weight: 400">List</h1>
+<button style="height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid #CFC5AE; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600">Sort: My order ▾</button>
 </div>
-<div style="display: flex; justify-content: space-between; align-items: center; gap: 10px"><h1 style="margin: 0; font-family: 'DM Serif Display', Georgia, serif; font-size: 28px; font-weight: 400">Eiffel Tower</h1><a href="Ask.dc.html" style="height: 40px; padding: 0 14px; border-radius: 20px; background: #14213D; color: #FFFFFF; display: flex; align-items: center; text-decoration: none; font-size: 14px; font-weight: 700; flex-shrink: 0">Ask about this</a></div>
+<div style="display: flex; gap: 6px; flex-wrap: wrap">
+<button style="height: 44px; padding: 0 10px; border-radius: 22px; border: 1px solid #14213D; background: #14213D; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 600">Hide traps</button>
+<button style="height: 44px; padding: 0 10px; border-radius: 22px; border: 1px solid #CFC5AE; background: #FFFFFF; font: inherit; font-size: 13px">Under $30</button>
+<button style="height: 44px; padding: 0 10px; border-radius: 22px; border: 1px solid #CFC5AE; background: #FFFFFF; font: inherit; font-size: 13px">Near me</button>
+<button style="height: 44px; padding: 0 10px; border-radius: 22px; border: 1px solid #CFC5AE; background: #FFFFFF; font: inherit; font-size: 13px">Kid-friendly</button>
+</div>
+
+<span style="font-size: 12px; font-weight: 700; color: #55524B; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px">Picked (3)</span>
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 10px 6px 10px 12px; background: #FFFFFF; border: 1px solid #E0D8C6; border-radius: 14px">
+<input type="checkbox" checked aria-label="Pick Eiffel Tower" style="width: 22px; height: 22px; accent-color: #14213D">
+<a href="Card.dc.html" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; color: #14213D; text-decoration: none">
+<span style="font-size: 16px; font-weight: 600">Eiffel Tower</span>
+<span style="display: flex; gap: 6px; align-items: center; font-size: 12px"><span style="padding: 2px 7px; border-radius: 6px; white-space: nowrap; background: #14213D; color: #E7C46A; font-weight: 700">Must-See</span><span style="color: #55524B">Worth 9.5 · Value 7 · $29 pp</span></span>
+</a>
+<button aria-label="Drag to reorder Eiffel Tower" style="width: 44px; height: 44px; border: none; background: transparent; color: #55524B"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h16M4 12h16M4 16h16"></path></svg></button>
+</div>
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 10px 6px 10px 12px; background: #FFFFFF; border: 1px solid #E0D8C6; border-radius: 14px">
+<input type="checkbox" checked aria-label="Pick Louvre" style="width: 22px; height: 22px; accent-color: #14213D">
+<a href="Card.dc.html" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; color: #14213D; text-decoration: none">
+<span style="font-size: 16px; font-weight: 600">Louvre (highlights tour)</span>
+<span style="display: flex; gap: 6px; align-items: center; font-size: 12px"><span style="padding: 2px 7px; border-radius: 6px; white-space: nowrap; background: #14213D; color: #E7C46A; font-weight: 700">Must-See</span><span style="color: #55524B">Worth 9 · Value 8 · $24 pp</span></span>
+</a>
+<button aria-label="Drag to reorder Louvre" style="width: 44px; height: 44px; border: none; background: transparent; color: #55524B"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h16M4 12h16M4 16h16"></path></svg></button>
+</div>
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 10px 6px 10px 12px; background: #FFFFFF; border: 1px solid #E0D8C6; border-radius: 14px">
+<input type="checkbox" checked aria-label="Pick Sainte-Chapelle" style="width: 22px; height: 22px; accent-color: #14213D">
+<a href="Card.dc.html" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; color: #14213D; text-decoration: none">
+<span style="font-size: 16px; font-weight: 600">Sainte-Chapelle</span>
+<span style="display: flex; gap: 6px; align-items: center; font-size: 12px"><span style="padding: 2px 7px; border-radius: 6px; white-space: nowrap; background: #E9EFE4; color: #2E4A2B; font-weight: 700">Hidden Gem</span><span style="color: #55524B">Worth 8.5 · Value 9 · $15 pp</span></span>
+</a>
+<button aria-label="Drag to reorder Sainte-Chapelle" style="width: 44px; height: 44px; border: none; background: transparent; color: #55524B"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h16M4 12h16M4 16h16"></path></svg></button>
+</div>
+
+<span style="font-size: 12px; font-weight: 700; color: #55524B; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px">Undecided (14)</span>
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 10px 6px 10px 12px; background: #FFFFFF; border: 1px solid #E0D8C6; border-radius: 14px">
+<input type="checkbox" aria-label="Pick Montmartre" style="width: 22px; height: 22px; accent-color: #14213D">
+<a href="Card.dc.html" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; color: #14213D; text-decoration: none">
+<span style="font-size: 16px; font-weight: 600">Montmartre + Sacré-Cœur</span>
+<span style="display: flex; gap: 6px; align-items: center; font-size: 12px"><span style="padding: 2px 7px; border-radius: 6px; white-space: nowrap; background: #14213D; color: #E7C46A; font-weight: 700">Must-See</span><span style="color: #55524B">Worth 8.5 · Value 10 · Free</span></span>
+</a>
+<button aria-label="Drag to reorder Montmartre" style="width: 44px; height: 44px; border: none; background: transparent; color: #55524B"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h16M4 12h16M4 16h16"></path></svg></button>
+</div>
+
+<div style="display: flex; border-radius: 14px; overflow: hidden; background: #8A2B1C; position: relative"><span style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: #FFFFFF; font-size: 14px; font-weight: 700">Eliminate</span>
+<div style="flex: 1; display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #FFFFFF; border: 1px solid #E0D8C6; border-radius: 14px; transform: translateX(-96px); min-width: 100%; box-sizing: border-box">
+<input type="checkbox" aria-label="Pick Seine dinner cruise" style="width: 22px; height: 22px; accent-color: #14213D">
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 16px; font-weight: 600">Seine dinner cruise</span>
+<span style="display: flex; gap: 6px; align-items: center; font-size: 12px"><span style="padding: 2px 7px; border-radius: 6px; white-space: nowrap; background: #F6D3CC; color: #7A1F12; font-weight: 700">Tourist Trap</span><span style="color: #55524B">Worth 5 · Value 3</span></span>
+</div>
+</div>
+</div>
+
+<button style="display: flex; justify-content: space-between; align-items: center; height: 48px; padding: 0 14px; border-radius: 14px; border: 1px dashed #A89F8A; background: #EFE9DC; font: inherit; font-size: 14px; font-weight: 600; color: #55524B">Eliminated (12)<span aria-hidden="true">▾</span></button>
+
+
+<a href="Ask.dc.html" style="position: absolute; right: 16px; bottom: 92px; width: 60px; height: 60px; border-radius: 30px; background: #D9A21B; color: #14213D; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 15px; font-weight: 700">Ask</a>
+
+<nav aria-label="Main" style="position: absolute; left: 0; right: 0; bottom: 0; height: 76px; background: #FFFFFF; border-top: 1px solid #E0D8C6; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding-bottom: 10px; box-sizing: border-box">
+<a href="Today.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 600; color: #55524B; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"></path></svg>Today</a>
+<a href="List.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 700; color: #14213D; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>List</a>
+<a href="Day.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 600; color: #55524B; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M3 9h18M8 2v4M16 2v4"></path></svg>Days</a>
+<a href="Countdown.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 600; color: #55524B; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"></path></svg>Must-sees</a>
+<a href="Snap.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 600; color: #55524B; text-decoration: none"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>Trip</a>
+</nav>
+</div>
+<a href="List.dc.html" aria-label="Close card" style="position: absolute; inset: 0; background: rgba(20, 33, 61, 0.55)"></a>
+<div role="dialog" aria-modal="true" aria-labelledby="card-title" style="position: absolute; left: 12px; right: 12px; top: 52px; box-sizing: border-box; padding: 16px 16px 18px; border-radius: 22px; background: #F7F3EA; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<span style="padding: 6px 12px; border-radius: 8px; background: #14213D; color: #E7C46A; font-size: 14px; font-weight: 700">Must-See</span>
+<a href="List.dc.html" aria-label="Close" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 22px; background: #F4F1EA; color: #14213D; text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></a>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 10px"><h1 id="card-title" style="margin: 0; font-family: 'DM Serif Display', Georgia, serif; font-size: 28px; font-weight: 400">Eiffel Tower</h1><a href="Ask.dc.html" style="height: 40px; padding: 0 14px; border-radius: 20px; background: #14213D; color: #FFFFFF; display: flex; align-items: center; text-decoration: none; font-size: 14px; font-weight: 700; flex-shrink: 0">Ask about this</a></div>
 
 <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
 <div style="display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: 12px; background: #FFFFFF; border: 1px solid #E0D8C6"><span style="font-size: 12px; color: #55524B; font-weight: 600">Worth it</span><span style="font-size: 22px; font-weight: 700">9.5<span style="font-size: 13px; color: #55524B">/10</span></span></div>
@@ -42,10 +118,10 @@ a{color:#14213D}a:hover{color:#7A5600}
 <span style="font-size: 14px"><strong>Why:</strong> the one view of Paris you'd regret missing.</span>
 <span style="font-size: 14px"><strong>Tip:</strong> book the 9 AM slot; go back at night for the sparkle (free from the lawn).</span>
 
-<div style="flex-grow: 1"></div>
 <div style="display: flex; gap: 8px">
 <a href="Day.dc.html" style="flex: 2; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: #14213D; color: #FFFFFF; text-decoration: none; font-size: 15px; font-weight: 600">On Day 4 · 11:00 ▾</a>
 <button style="flex: 1; height: 50px; border-radius: 14px; border: 1px solid #CFC5AE; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600">Move to bottom</button>
+</div>
 </div>
 </div>
 </x-dc>

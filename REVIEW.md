@@ -32,12 +32,19 @@ Same tokens as Chef Luc and Wardrobe COO:
 5. **Today:** the Ask button covered the ghost guide's Adult toggle. More bottom space added.
 6. **Trip Setup and Today** frames were cut off at the bottom. Made taller.
 
-## 3. Open issues to decide
-1. **Ghost guide (location-triggered):** a web app can't track location in the background. It works only while the app is open. Background triggers need native Android.
-2. **Alerts** (flight moved, must-see at risk): a web app shows them when opened. Push to the lock screen needs native Android, or an email/Calendar alert from the Google script.
-3. **Budget, pace, crowd** segments are drawn as text, not buttons. Fix in the build (real buttons, 44 px).
-4. **Swipe to eliminate** needs a second way for accessibility. Suggest the long-press menu also offers "Eliminate".
-5. **Docs/passports:** dropped by decision; KAYAK and the phone hold them. OK.
+## 3. Decisions (Nov 22)
+- **Ghost guide:** plays only while the app is open. OK.
+- **Alerts:** by email from the Google script. OK.
+- **Build:** web app + Google script, as in section 4. OK.
+- **Day shape:** start, end, downtime on/off, downtime start and length, each with −/+ (15 min steps), suggestion in parentheses, "Custom" tag. Booked tickets keep their time.
+- **Activity Card:** a dialog over the current screen. Closes with the X or a tap outside.
+
+## Open issues
+1. **Budget, pace, crowd** segments are drawn as text, not buttons. Fix in the build (real buttons, 44 px).
+2. **Swipe to eliminate** needs a second way for accessibility. Suggest the long-press menu also offers "Eliminate".
+
+
+3. **Docs/passports:** dropped by decision; KAYAK and the phone hold them.
 
 ## 4. Build plan (same recipe as the other apps)
 **Recommendation: web app (PWA) on GitHub Pages, like Chef Luc.**

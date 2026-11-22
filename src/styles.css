@@ -223,3 +223,11 @@ textarea.field { height: auto; padding: 10px 12px; resize: vertical; line-height
 .banner { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); }
 .dot { width: 8px; height: 8px; border-radius: 4px; flex-shrink: 0; background: var(--gold); }
 .dot.red { background: var(--danger); }
+
+/* Photos (Wikipedia / Wikimedia Commons): never block, fade in when loaded, fixed size (no jump). */
+.photos { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 0 16px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.photos::-webkit-scrollbar { display: none; }
+.photos img { flex: 0 0 84%; height: 190px; object-fit: cover; border-radius: 14px; background: var(--tile); scroll-snap-align: center; opacity: 0; transition: opacity 200ms ease-out; }
+.photos.one img { flex-basis: 100%; }
+.photos img.in, .thumb.in { opacity: 1; }
+.thumb { width: 64px; height: 64px; flex-shrink: 0; object-fit: cover; border-radius: 12px; background: var(--tile); opacity: 0; transition: opacity 200ms ease-out; }

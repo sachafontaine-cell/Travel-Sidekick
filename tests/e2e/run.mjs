@@ -26,6 +26,8 @@ async function page(opts = {}) {
   p.errors = []
   p.on('pageerror', (e) => p.errors.push(e.message))
   p.on('console', (m) => { if (m.type() === 'error') p.errors.push(m.text()) })
+  // Wikipedia is faked: by default it knows nothing (tests that need photos set their own).
+  await p.route(/wikipedia\.org|wikidata\.org|wikimedia\.org/, (r) => r.fulfill({ json: { query: { geosearch: [] } } }))
   return p
 }
 const text = (p) => p.evaluate(() => document.body.innerText)
@@ -129,6 +131,26 @@ await test('sample trip: Day view drag moves downtime; Back closes overlays firs
   await p.goBack()
   await p.getByRole('dialog').waitFor({ state: 'detached' })
   expect(p.url().includes('plan/3'), 'still on Day 3 after Back')
+  await p.context().close()
+})
+
+await test('photos: the Eiffel Tower card shows its official photo; a restaurant shows none', async () => {
+  const p = await page()
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
+  await p.route(/wikipedia\.org\/w\/api\.php.*geosearch/, (r) => r.fulfill({ json: { query: { geosearch: r.request().url().includes('48.8584') ? [{ title: 'Eiffel Tower', dist: 20 }] : [] } } }))
+  await p.route(/wikipedia\.org\/api\/rest_v1\/page\/summary/, (r) => r.fulfill({ json: { type: 'standard', title: 'Eiffel Tower', wikibase_item: 'Q243', coordinates: { lat: 48.8583, lon: 2.2944 } } }))
+  await p.route(/wikidata\.org/, (r) => r.fulfill({ json: { claims: { P18: [{ mainsnak: { datavalue: { value: 'Tour Eiffel Wikimedia Commons.jpg' } } }] } } }))
+  await p.route(/commons\.wikimedia\.org/, (r) => r.fulfill({ status: 200, contentType: 'image/png', body: png }))
+  await p.goto(BASE + '?demo#/t/demo-paris/plan/4')
+  await p.locator('.slot .open', { hasText: 'Eiffel Tower' }).click()
+  await p.locator('.photos img.in').first().waitFor({ timeout: 8000 })
+  expect((await p.locator('.photos img').first().getAttribute('src')).includes('Tour_Eiffel_Wikimedia_Commons.jpg'), 'official photo')
+  expect((await p.getByRole('dialog').innerText()).includes('Photos on Google Maps'), 'Google Maps photos link')
+  await p.keyboard.press('Escape')
+  await p.goto(BASE + '?demo#/t/demo-paris/plan/3')
+  await p.locator('.slot .open', { hasText: 'Le Fumoir' }).click()
+  await p.waitForTimeout(800)
+  expect(await p.locator('.photos img').count() === 0, 'no photo for the restaurant')
   await p.context().close()
 })
 

@@ -8,6 +8,7 @@ import { refreshWeather } from './weather'
 import { checkHours, localRules } from './ai'
 import { dateOf, tripDays } from './planner'
 import type { Place, Trip } from './model'
+import { findPhotos, wantsPhoto } from './photos'
 
 const busy = new Set<string>()
 async function once(key: string, job: () => Promise<void>) {
@@ -41,6 +42,20 @@ async function hoursJob(trip: Trip) {
   if (changed.length) save('place', changed)
 }
 
+/** Photos for places you'll see soon: today's and upcoming days first, then picked, then the rest. */
+export async function photoFor(p: Place, trip: Trip) {
+  if (!wantsPhoto(p) || (typeof navigator !== 'undefined' && navigator.onLine === false)) return
+  const photos = await findPhotos(p, trip)
+  const cur = places.get()[p.id]
+  if (cur && !cur.photos) save('place', [{ ...cur, photos }])
+}
+async function photosJob(trip: Trip) {
+  const now = nowIn(trip)
+  const score = (p: Place) => (p.day != null && p.day >= now.day ? 0 : p.must ? 1 : p.status === 'picked' ? 2 : 3)
+  const todo = tripPlaces(trip.id).filter(wantsPhoto).sort((a, b) => score(a) - score(b)).slice(0, 8)
+  for (const p of todo) { await photoFor(p, trip); await new Promise((r) => setTimeout(r, 300)) }
+}
+
 function run() {
   const r = route.get()
   if (r.name === 'trips') return
@@ -54,6 +69,7 @@ function run() {
   })
   void once('wx' + trip.id, () => refreshWeather(trip, now.day >= 1 && now.day <= tripDays(trip) ? now.date : trip.start, Math.floor(now.min / 60)))
   void once('hours' + trip.id, () => hoursJob(trip))
+  void once('photos' + trip.id, () => photosJob(trip))
   void once('rules' + trip.id, async () => {
     if (DEMO || !trip.built || trip.rules?.length || !settings.get().geminiKey) return
     const rules = await localRules(trip)

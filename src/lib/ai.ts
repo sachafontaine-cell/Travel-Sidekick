@@ -42,10 +42,10 @@ export function tripBrief(t: Trip): string {
 }
 
 const FIELDS = `Each place is one JSON object on its own line (JSON Lines, no array, no prose, no code fences):
-{"name":"","kind":"sight|museum|park|meal|snack|show|shop|other","lat":0,"lng":0,"badge":"must|worth|depends|trap|gem","must":true,"worth":0-10,"value":0-10,"sub":{"iconic":0-10,"vibe":0-10,"hassle":0-10,"kid":0-10},"rec":"pay|cheaper|skip","recText":"one sentence, max 90 chars","why":"max 70 chars","tip":"max 100 chars","price":adult price per person in local currency (0 if free),"minutes":time to spend there with this family,"indoor":true|false,"hours":["Sun","Mon","Tue","Wed","Thu","Fri","Sat" each as "HH:MM-HH:MM" or "closed"]}
+{"name":"","kind":"sight|museum|park|meal|snack|show|shop|other","lat":0,"lng":0,"badge":"must|worth|depends|trap|gem","must":true,"worth":0-10,"value":0-10,"sub":{"iconic":0-10,"vibe":0-10,"hassle":0-10,"kid":0-10},"rec":"pay|cheaper|skip","recText":"one sentence, max 90 chars","why":"max 70 chars","tip":"max 100 chars","price":adult price per person in local currency (0 if free),"minutes":time to spend there with this family,"indoor":true|false,"hours":["Sun","Mon","Tue","Wed","Thu","Fri","Sat" each as "HH:MM-HH:MM" or "closed"],"wiki":"exact English Wikipedia article title about this exact place, or null"}
 Rules: "hassle" is LOW hassle (10 = easy). "value" = worth per money compared with similar options. "must" only for the true can't-miss sights (6 to 10 of them). Never mark a must-see "skip". Be honest about tourist traps. "meal" = sit-down lunch/dinner places near the main sights; "snack" = bakeries, ice cream, quick bites.`
 
-interface RawPlace { name: string; kind: Kind; lat: number; lng: number; badge: Badge; must: boolean; worth: number; value: number; sub: Place['sub']; rec: Place['rec']; recText: string; why: string; tip: string; price: number; minutes: number; indoor: boolean; hours?: string[] }
+interface RawPlace { name: string; kind: Kind; lat: number; lng: number; badge: Badge; must: boolean; worth: number; value: number; sub: Place['sub']; rec: Place['rec']; recText: string; why: string; tip: string; price: number; minutes: number; indoor: boolean; hours?: string[]; wiki?: string | null }
 
 const KINDS: Kind[] = ['sight', 'museum', 'park', 'meal', 'snack', 'show', 'shop', 'other']
 const clamp = (n: unknown, lo = 0, hi = 10) => Math.min(hi, Math.max(lo, Number(n) || 0))
@@ -73,6 +73,7 @@ export function toPlace(raw: RawPlace, trip: Trip, rank: string): Place | null {
     rec: raw.must && raw.rec === 'skip' ? 'cheaper' : (['pay', 'cheaper', 'skip'] as const).includes(raw.rec) ? raw.rec : 'pay',
     recText: String(raw.recText ?? '').slice(0, 140), why: String(raw.why ?? '').slice(0, 120), tip: String(raw.tip ?? '').slice(0, 160),
     price: Math.max(0, Number(raw.price) || 0), minutes, suggested: minutes, indoor: !!raw.indoor,
+    wiki: typeof raw.wiki === 'string' && raw.wiki.trim() ? raw.wiki.trim().slice(0, 120) : null,
     hours: parseHours(raw.hours), status: raw.badge === 'trap' ? 'out' : raw.must ? 'picked' : 'maybe', rank, day: null, at: Date.now(),
   }
 }

@@ -14,6 +14,7 @@ import { short } from '../lib/money'
 import { tripDays } from '../lib/planner'
 import { langName } from '../lib/money'
 import type { Energy, Trip } from '../lib/model'
+import { Photos } from './card'
 
 export const translateUrl = (t: Trip) => `https://translate.google.com/?sl=${t.dest.lang}&tl=en&op=translate`
 
@@ -127,9 +128,12 @@ export function Today({ trip }: { trip: Trip }) {
       {list.length > 0 && idea && (
         <div class="card hero">
           <div class="between"><span class="h2">What now?</span><span class="muted small">{duration(gap.minutes)} free</span></div>
-          <button class="idea press" onClick={() => open({ kind: 'card', place: idea.place.id })}>
-            <span class="between"><b>{idea.place.name}</b><b>{idea.place.worth}/10</b></span>
-            <span class="muted small">{idea.travel.minutes} min {idea.travel.mode === 'metro' ? 'metro' : 'walk'} · {short(trip, idea.place.price)} · {idea.minutes} min · {idea.place.why}</span>
+          <button class="idea press row" style={{ alignItems: 'flex-start' }} onClick={() => open({ kind: 'card', place: idea.place.id })}>
+            <Photos p={idea.place} size="thumb" />
+            <span class="grow stack" style={{ gap: '4px' }}>
+              <span class="between"><b>{idea.place.name}</b><b>{idea.place.worth}/10</b></span>
+              <span class="muted small">{idea.travel.minutes} min {idea.travel.mode === 'metro' ? 'metro' : 'walk'} · {short(trip, idea.place.price)} · {idea.minutes} min · {idea.place.why}</span>
+            </span>
           </button>
           {list.length > 1 && <button class="btn btn-quiet btn-sm press" onClick={() => setPick(pick + 1)}>Another idea</button>}
           <div class="stack" style={{ gap: '4px' }}>

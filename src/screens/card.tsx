@@ -1,6 +1,6 @@
 // The Activity Card: every list row, alert, day slot and chat mention opens this same dialog.
 // It's the one place for anything about a single place: star, day, time there, done.
-import { useState } from 'preact/hooks'
+import { useEffect, useState } from 'preact/hooks'
 import { BadgeFull, Dialog, Icon, Stepper } from '../ui'
 import { nowIn, places, plansFor } from '../lib/data'
 import { close, open, replaceTop } from '../lib/nav'
@@ -8,7 +8,19 @@ import { setMinutes, setMust } from '../lib/actions'
 import { dateOf, hoursOn } from '../lib/planner'
 import { clock, duration } from '../lib/time'
 import { price } from '../lib/money'
-import type { Trip } from '../lib/model'
+import type { Place, Trip } from '../lib/model'
+import { photoFor } from '../lib/background'
+
+export function Photos({ p, size = 'big' }: { p: Place; size?: 'big' | 'thumb' }) {
+  const urls = p.photos?.urls ?? []
+  if (!urls.length) return null
+  if (size === 'thumb') return <img class="thumb" src={urls[0]} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onLoad={(e) => (e.currentTarget as HTMLImageElement).classList.add('in')} />
+  return (
+    <div class={`photos${urls.length === 1 ? ' one' : ''}`}>
+      {urls.map((u) => <img src={u} alt={`${p.name}`} loading="lazy" decoding="async" referrerpolicy="no-referrer" onLoad={(e) => (e.currentTarget as HTMLImageElement).classList.add('in')} />)}
+    </div>
+  )
+}
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const REC = { pay: 'Pay for it', cheaper: 'Do the cheaper version', skip: 'Skip it' }
@@ -16,6 +28,8 @@ const REC = { pay: 'Pay for it', cheaper: 'Do the cheaper version', skip: 'Skip 
 export function Card({ trip, id }: { trip: Trip; id: string }) {
   const p = places.use()[id]
   const [why, setWhy] = useState(false)
+  // Photos are looked up in the background; if this one hasn't been yet, do it now (never blocks).
+  useEffect(() => { if (p && !p.photos) void photoFor(p, trip) }, [id])
   if (!p) return null
   const now = nowIn(trip)
   const day = p.day ?? null
@@ -33,6 +47,7 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
         </button>
         <div class="row"><BadgeFull p={p} /><button class="iconbtn ring press" aria-label="Close" onClick={close}><Icon.x /></button></div>
       </div>
+      <Photos p={p} />
       <h2 class="h2">{p.name}</h2>
 
       {p.scoring ? <p class="muted">Scoring… a few seconds.</p> : (
@@ -57,6 +72,8 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
       </div>
       <button class="btn btn-quiet press" onClick={() => replaceTop({ kind: 'ask', place: p.id })}><Icon.chat />Ask about this</button>
 
+      <a class="link press" href={maps} target="_blank" rel="noopener">Photos on Google Maps<Icon.out /></a>
+      {p.photos?.urls.length ? <span class="muted small">Photo{p.photos.urls.length > 1 ? 's' : ''}: <a href={`https://${p.photos.lang}.wikipedia.org/wiki/${encodeURIComponent(p.photos.title.replace(/ /g, '_'))}`} target="_blank" rel="noopener">Wikipedia</a></span> : null}
       {!p.scoring && (
         <button class="link press" aria-expanded={why} onClick={() => setWhy(!why)}>Why {p.worth}?{why ? <Icon.up /> : <Icon.down />}</button>
       )}

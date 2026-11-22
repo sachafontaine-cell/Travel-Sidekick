@@ -34,6 +34,11 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ttf}'],
         navigateFallback: BASE + 'index.html',
+        runtimeCaching: [{
+          urlPattern: ({ url }) => url.hostname.endsWith('wikimedia.org'),
+          handler: 'CacheFirst',
+          options: { cacheName: 'photos', expiration: { maxEntries: 150, maxAgeSeconds: 90 * 24 * 3600 }, cacheableResponse: { statuses: [0, 200] } },
+        }],
         skipWaiting: true,
         clientsClaim: true,
       },

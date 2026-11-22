@@ -68,6 +68,10 @@ export interface Place {
   done?: boolean
   /** Being scored by Gemini right now (added by hand). */
   scoring?: boolean
+  /** The English Wikipedia article for this place, if Gemini knows one (checked before use). */
+  wiki?: string | null
+  /** Representative photos (Wikipedia), looked up once. `urls` empty = none found. */
+  photos?: { title: string; lang: string; urls: string[]; at: number }
   at: number
   by?: string
 }

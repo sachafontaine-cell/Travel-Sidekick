@@ -20,8 +20,11 @@ if (DEMO && !location.hash.replace(/^#\/?/, '')) go(tripPath('demo-paris'), true
 
 // The family link (…/?k=KEY&api=SCRIPT_URL) is read once, kept on this phone, then hidden.
 const q = new URLSearchParams(location.search)
+// Only a real Apps Script web app address is accepted (not the WEB_APP_URL placeholder).
+export const validApi = (u: string | null) => !!u && /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u.trim())
 if (q.get('k')) {
-  settings.set({ ...settings.get(), familyKey: q.get('k')!, api: q.get('api') ?? settings.get().api })
+  const api = q.get('api')
+  settings.set({ ...settings.get(), familyKey: q.get('k')!, api: validApi(api) ? api!.trim() : settings.get().api, badApi: api && !validApi(api) ? api.slice(0, 40) : undefined })
   q.delete('k'); q.delete('api')
   history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash)
 }

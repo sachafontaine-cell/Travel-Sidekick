@@ -80,8 +80,10 @@ function Family() {
   const st = syncState.use()
   settings.use()
   if (DEMO) return <p class="muted">The sample trip never syncs.</p>
+  const bad = settings.get().badApi
   if (!connected()) return (
     <div class="stack">
+      {bad && <p class="answer err">The family link's script address is wrong ("{bad}"). It must end with the Web app URL: https://script.google.com/macros/s/…/exec (Deploy → Manage deployments).</p>}
       <p class="muted">Not connected. Open the family link once on this phone (from the Google script setup). Until then, everything stays on this phone.</p>
       {familyKey() && <p class="muted small">Family key found (Control Center); the script address is still missing.</p>}
     </div>

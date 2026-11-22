@@ -18,6 +18,8 @@ export interface Settings {
   api?: string
   familyKey?: string
   alerts?: string[]
+  /** A family link whose script address wasn't a web app URL (shown as a fix-it hint). */
+  badApi?: string
   energy?: { date: string; level: Energy }
 }
 export const settings = createStore<Settings>({}, 'settings')

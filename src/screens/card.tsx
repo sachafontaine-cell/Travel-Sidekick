@@ -44,7 +44,7 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
       {p.recText && <p><b>{REC[p.rec]}.</b> {cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?)[:.,]?\s*/i, ''))}</p>}
 
       <div class="banner" style={{ padding: '6px 6px 6px 14px' }}>
-        <span class="grow small">{h === undefined ? 'Hours not known yet' : h === null ? <b style={{ color: 'var(--red)' }}>Closed {day ? `on Day ${day}` : 'today'}</b> : <><b>Open {clock(h[0], true)}–{clock(h[1], true)}</b>{day ? ` on Day ${day}` : ' today'}</>}
+        <span class="grow small">{h === undefined ? 'Hours not known yet' : h === null ? <b style={{ color: 'var(--red)' }}>Closed {day ? `on Day ${day}` : 'today'}</b> : <><b>Open {clock(h[0])}–{clock(h[1])}</b>{day ? ` on Day ${day}` : ' today'}</>}
           <br /><span class="muted">{checked ? `Checked with Google · ${checked}` : 'From Gemini; checked with Google the morning before'}</span></span>
         <a class="btn btn-quiet btn-sm press" href={maps} target="_blank" rel="noopener">Check hours<Icon.out /></a>
       </div>

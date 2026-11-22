@@ -17,7 +17,7 @@ Mockups in `mockups/` use sample names; the live canvas has the real ones.
 
 ## 1c. Decisions (Nov 22, later)
 - **No paid Google services, no card.** Gemini stays on the free tier: its project never gets billing (a project with billing loses the free tier). The hours check uses Gemini with Google Search (free daily allowance) instead of the paid Places service; OpenStreetMap hours as backup. Walking times use the Google script's built-in Maps (free). Self-update needs a Cloud project but no billing.
-- **Own Gemini key**, in its own new project ("Travel Sidekick" in AI Studio). Free limits are per project, so sharing Chef Luc's would split one allowance across three apps. Chef Luc's key stays as a one-tap fallback.
+- **Own Gemini key**, in its own new project ("Travel Sidekick" in AI Studio). Free limits are per project, so sharing Chef Luc's would split one allowance across three apps. No fallback to Chef Luc's key.
 - **GitHub two-step login:** yes.
 - **Steps:** no reliable way from a web app (see chat). Pace = today's planned walking + where you are when the app is open + one-tap Tired / OK / Fresh.
 - **OK:** + Add on List; first-run "Building your list" screen; Setup sections shrink to summaries after the first time; prices "€27 pp ($29)"; day tabs scroll for long trips.
@@ -115,8 +115,7 @@ One-time setup (~15 min, computer, click-by-click steps in the README): Google C
 
 ## 5c. Lessons from Chef Luc, Wardrobe COO and the Control Center
 **Gemini key (easy, one paste for both phones)**
-- All Fontaine apps share one web address, so if this phone already has Chef Luc's or Wardrobe COO's key: one tap, "Use the key from Chef Luc".
-- Otherwise Chef Luc's flow: **Get a key** (opens AI Studio) → Create API key → **Paste key**; checked in ~1 s without spending a request.
+- Chef Luc's flow: **Get a key** (opens AI Studio) → Create API key → **Paste key**; checked in ~1 s without spending a request.
 - The app hands the key to the script once; the other parent's phone picks it up on its next sync. Never in backups or the repo.
 
 **Gemini on the free tier**

@@ -10,9 +10,10 @@
 //              calendar become bookings in their trip; other trips are suggested, never added
 //   hourly     7:00 destination time: checks must-see hours with Google, emails if one is closed
 //              3 days before a trip: emails "download the language in Google Translate"
+//   routes     real Google Maps times from the hotel (walk, transit, car), free through this script
 //   nightly    updates this script from the repository when a newer version is published
 
-var VERSION = 5
+var VERSION = 6
 var REPO_RAW = 'https://raw.githubusercontent.com/sachafontaine-cell/Travel-Sidekick/main/script/'
 var APP_URL = 'https://sachafontaine-cell.github.io/Travel-Sidekick/'
 
@@ -61,11 +62,50 @@ function doPost(e) {
     if (body.op === 'scan') { requestScan(); return out({ ok: true }) }
     if (body.op === 'dismiss') { dismiss(String(body.id || '')); return out({ ok: true }) }
     if (body.op === 'update') return out(selfUpdate())
+    if (body.op === 'routes') return out(routes(body))
     if (body.op === 'ping') return out({ v: VERSION })
     return out({ error: 'Unknown request' })
   } catch (err) {
     return out({ error: String(err && err.message || err) })
   }
+}
+
+// ---------- Routes (Google Maps, free through Apps Script) ----------
+
+/**
+ * Walking, transit and driving times from `from` to each place, from Google Maps. Driving uses
+ * the traffic expected at `depart`; transit uses the timetable then (or now, if Google has none).
+ * Up to 10 places per call; the app saves the answers so each place is looked up once.
+ */
+function routes(body) {
+  var from = body.from || {}
+  var depart = body.depart ? new Date(Number(body.depart)) : null
+  if (depart && depart.getTime() < Date.now() + 60000) depart = new Date(Date.now() + 5 * 60000)
+  var M = Maps.DirectionFinder.Mode
+  var modes = [['walk', M.WALKING], ['transit', M.TRANSIT], ['car', M.DRIVING]]
+  var res = {}
+  ;(body.to || []).slice(0, 10).forEach(function (t) {
+    var r = {}
+    modes.forEach(function (m) {
+      var tries = m[0] === 'walk' || !depart ? [null] : [depart, null]
+      for (var i = 0; i < tries.length; i++) {
+        try {
+          var f = Maps.newDirectionFinder().setOrigin(Number(from.lat), Number(from.lng)).setDestination(Number(t.lat), Number(t.lng)).setMode(m[1])
+          if (tries[i]) f.setDepart(tries[i])
+          var d = f.getDirections()
+          var leg = d && d.routes && d.routes[0] && d.routes[0].legs && d.routes[0].legs[0]
+          if (!leg) continue
+          var sec = (leg.duration_in_traffic || leg.duration).value
+          r[m[0]] = Math.max(1, Math.round(sec / 60))
+          if (m[0] === 'walk') r.walkKm = Math.round(leg.distance.value / 100) / 10
+          if (m[0] === 'car') r.km = Math.round(leg.distance.value / 100) / 10
+          break
+        } catch (e) { r.err = String(e && e.message || e) }
+      }
+    })
+    res[String(t.id)] = r
+  })
+  return { ok: true, routes: res }
 }
 
 function out(obj) {

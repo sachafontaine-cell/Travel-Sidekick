@@ -39,7 +39,13 @@ function world(fetchImpl: (url: string, opts: any) => { code: number; body: stri
       return { getScriptId: () => 'script1', getOAuthToken: () => 'tok', triggers: trig, getProjectTriggers: () => trig.map((f) => ({ getHandlerFunction: () => f })), newTrigger: chain, deleteTrigger: (t: any) => { const i = trig.indexOf(t.getHandlerFunction()); if (i >= 0) trig.splice(i, 1) } }
     })(),
     CacheService: { getScriptCache: () => { const m: Record<string, string> = {}; return { get: (k: string) => m[k] ?? null, put: (k: string, v: string) => { m[k] = v } } } },
-    Maps: { newGeocoder: () => ({ geocode: () => ({ status: 'OK', results: [{ geometry: { location: { lat: 48.86, lng: 2.33 } } }] }) }) },
+    Maps: {
+      newGeocoder: () => ({ geocode: () => ({ status: 'OK', results: [{ geometry: { location: { lat: 48.86, lng: 2.33 } } }] }) }),
+      // Directions: walking 1 km = 14 min; transit has no timetable at the trip date (only now); driving has traffic.
+      DirectionFinder: { Mode: { WALKING: 'walking', TRANSIT: 'transit', DRIVING: 'driving' } },
+      newDirectionFinder: () => { const q: any = {}; const f: any = { setOrigin: () => f, setDestination: () => f, setMode: (m: string) => { q.mode = m; return f }, setDepart: (d: Date) => { q.depart = d; return f },
+        getDirections: () => q.mode === 'transit' && q.depart ? { routes: [] } : { routes: [{ legs: [{ distance: { value: q.mode === 'walking' ? 1000 : 1400 }, duration: { value: q.mode === 'walking' ? 840 : q.mode === 'transit' ? 720 : 300 }, ...(q.mode === 'driving' && q.depart ? { duration_in_traffic: { value: 600 } } : {}) }] }] } }; return f },
+    },
     GmailApp: { search: () => [] },
     console,
   }
@@ -56,6 +62,11 @@ describe('family script', () => {
   let w: ReturnType<typeof world>
   beforeEach(() => { w = world() })
 
+  it('gives real Google Maps times from the hotel: traffic for driving, transit falls back to now', () => {
+    const r = w.post({ k: 'family-key-123', op: 'routes', from: { lat: 1, lng: 2 }, depart: Date.now() + 86400000, to: [{ id: 'p1', lat: 1.01, lng: 2 }] })
+    expect(r.routes.p1).toMatchObject({ walk: 14, transit: 12, car: 10, km: 1.4, walkKm: 1 })
+  })
+
   it('refuses a wrong family key', () => {
     expect(w.post({ k: 'nope', op: 'sync' })).toEqual({ error: 'Wrong family key' })
   })
@@ -70,7 +81,7 @@ describe('family script', () => {
     w.tick()
     const c = w.post({ k: 'family-key-123', op: 'sync', since: a.now, put: [{ coll: 'place', id: 'p2', at: 200, data: { id: 'p2' } }] })
     expect(c.recs.map((r: any) => r.id)).toEqual(['p2'])
-    expect(c.v).toBe(5)
+    expect(c.v).toBe(6)
   })
 
   it('shares the Gemini key with the other phone', () => {
@@ -108,14 +119,14 @@ describe('family script', () => {
     const calls: string[] = []
     w = world((url, opts) => {
       calls.push(`${(opts.method ?? 'get').toUpperCase()} ${url.replace(/^https:\/\/[^/]+/, '')}`)
-      if (url.endsWith('version.json')) return { code: 200, body: '{"version":6}' }
-      if (url.endsWith('Code.gs')) return { code: 200, body: 'var VERSION = 6\n' }
+      if (url.endsWith('version.json')) return { code: 200, body: '{"version":99}' }
+      if (url.endsWith('Code.gs')) return { code: 200, body: 'var VERSION = 99\n' }
       if (url.endsWith('appsscript.json')) return { code: 200, body: '{}' }
       if (url.endsWith('/deployments') && !opts.method?.match(/put/)) return { code: 200, body: JSON.stringify({ deployments: [{ deploymentId: 'HEAD', deploymentConfig: {} }, { deploymentId: 'web1', deploymentConfig: { versionNumber: 1 }, entryPoints: [{ entryPointType: 'WEB_APP' }] }] }) }
       if (url.endsWith('/versions')) return { code: 200, body: '{"versionNumber":7}' }
       return { code: 200, body: '{}' }
     })
-    expect(w.post({ k: 'family-key-123', op: 'update' })).toEqual({ ok: true, v: 6 })
+    expect(w.post({ k: 'family-key-123', op: 'update' })).toEqual({ ok: true, v: 99 })
     expect(calls).toContain('PUT /v1/projects/script1/content')
     expect(calls).toContain('PUT /v1/projects/script1/deployments/web1')
     expect(w.props.DEPLOYMENT_ID).toBe('web1')

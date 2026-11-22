@@ -7,7 +7,7 @@ import { merge, outbox, settings, whenChanged, type Rec } from './data'
 import { afterMerge } from './found'
 
 /** The script version this app needs; an older script is asked to update itself. */
-export const SCRIPT_NEEDED = 5
+export const SCRIPT_NEEDED = 6
 
 export const cursor = createStore<number>(0, 'cursor')
 /** The script's last email check: when, what it added, or why it failed. */

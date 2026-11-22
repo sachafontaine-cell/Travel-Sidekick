@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from 'preact/hooks'
 import { createStore } from '../lib/store'
 import { BadgeChip, Icon, Spinner, StateChip } from '../ui'
 import { refreshList, refreshing, stale } from '../lib/refresh'
-import { youngKids } from '../lib/people'
+import { fromHotel } from '../lib/routes'
 import { days, nowIn, places, plansFor, save, tripPlaces, trips } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
 import { moveInDay, moveInList, pushDown, setDay, setStatus } from '../lib/actions'
@@ -195,7 +195,7 @@ function Row({ trip, p, draggable, onGrip }: { trip: Trip; p: Place; draggable: 
       <Tick p={p} />
       <button class="open press" onClick={() => open({ kind: 'card', place: p.id })}>
         <span class="name">{p.name}</span>
-        <span class="meta">{p.fresh && <span class="chip ok">New</span>}<BadgeChip p={p} />{p.scoring ? <span>Scoring…</span> : <span>Worth {p.worth} · {price(trip, p.price, false)}{trip.base && !p.booked ? ` · ${legText(leg(trip.base, p, youngKids(trip)))}` : ''}</span>}{p.day ? <span class="chip plain">Day {p.day}</span> : p.status === 'picked' && unfitIds.get().includes(p.id) ? <span class="chip amber">Doesn't fit</span> : null}{p.done && <span class="chip plain">Done</span>}</span>
+        <span class="meta">{p.fresh && <span class="chip ok">New</span>}<BadgeChip p={p} />{p.scoring ? <span>Scoring…</span> : <span>Worth {p.worth} · {price(trip, p.price, false)}{trip.base && !p.booked ? (() => { const f = fromHotel(trip, p); return f ? ` · ${f.real ? '' : '≈'}${legText(f)}` : '' })() : ''}</span>}{p.day ? <span class="chip plain">Day {p.day}</span> : p.status === 'picked' && unfitIds.get().includes(p.id) ? <span class="chip amber">Doesn't fit</span> : null}{p.done && <span class="chip plain">Done</span>}</span>
       </button>
       {draggable && <span class="handle" role="button" aria-label={`Drag to reorder ${p.name}`} onPointerDown={(e) => onGrip(e as unknown as PointerEvent)}><Icon.grip /></span>}
     </div>

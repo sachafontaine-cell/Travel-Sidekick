@@ -11,8 +11,9 @@ import { dateOf, hoursOn } from '../lib/planner'
 import { clock, duration, pad, parseClock } from '../lib/time'
 import { price } from '../lib/money'
 import type { Place, Trip } from '../lib/model'
-import { leg, legText, options, type Mode } from '../lib/geo'
-import { youngKids } from '../lib/people'
+import { legText, type Mode } from '../lib/geo'
+import { fromHotel, routesFor } from '../lib/routes'
+import { connected } from '../lib/sync'
 import { photoFor } from '../lib/background'
 
 /** Google Maps photos, as a square tile where a photo would be (or after the photos). */
@@ -34,17 +35,19 @@ export function Photos({ p, size = 'big', maps }: { p: Place; size?: 'big' | 'th
 
 /** From the hotel: all three ways, the one we'd take in bold, and a Directions link. */
 function FromHotel({ trip, p }: { trip: Trip; p: Place }) {
+  const f = fromHotel(trip, p)
+  // No real Google Maps times yet: ask for this one now (the background does the rest).
+  useEffect(() => { if (f && !f.real) void routesFor(trip, [p]).catch(() => { /* later */ }) }, [p.id, trip.base?.lat, trip.base?.lng])
+  if (!f) return null
   const base = trip.base!
-  const kids = youngKids(trip)
-  const best = leg(base, p, kids)
-  const o = options(base, p, kids)
-  const d = best.km * 1.3
   const I = { walk: Icon.walk, transit: Icon.train, car: Icon.car }
-  const dir = `https://www.google.com/maps/dir/?api=1&origin=${base.lat},${base.lng}&destination=${encodeURIComponent(`${p.name}, ${trip.dest.name}`)}&travelmode=${best.mode === 'car' ? 'driving' : best.mode === 'transit' ? 'transit' : 'walking'}`
+  const dir = `https://www.google.com/maps/dir/?api=1&origin=${base.lat},${base.lng}&destination=${encodeURIComponent(`${p.name}, ${trip.dest.name}`)}&travelmode=${f.mode === 'car' ? 'driving' : f.mode === 'transit' ? 'transit' : 'walking'}`
+  const ap = f.real ? '' : '≈'
   return (
     <div class="fromhotel">
-      <div class="between"><span class="small"><b>{legText(best)}</b> from {base.name.split(',')[0]} · {d < 10 ? d.toFixed(1) : Math.round(d)} km</span><a class="link small press" href={dir} target="_blank" rel="noopener">Directions<Icon.out /></a></div>
-      <div class="modes">{(['walk', 'transit', 'car'] as Mode[]).filter((m) => isFinite(o[m])).map((m) => { const M = I[m]; return <span class={`mode${m === best.mode ? ' on' : ''}`}><M />{Math.round(o[m])} min</span> })}</div>
+      <div class="between"><span class="small"><b>{ap}{legText(f)}</b> from {base.name.split(',')[0]} · {f.km < 10 ? f.km.toFixed(1) : Math.round(f.km)} km</span><a class="link small press" href={dir} target="_blank" rel="noopener">Directions<Icon.out /></a></div>
+      <div class="modes">{(['walk', 'transit', 'car'] as Mode[]).filter((m) => f.times[m] != null).map((m) => { const M = I[m]; return <span class={`mode${m === f.mode ? ' on' : ''}`}><M />{ap}{f.times[m]} min</span> })}</div>
+      <span class="muted small">{f.real ? 'Google Maps times, with expected traffic' : connected() ? 'Estimate: getting Google Maps times…' : 'Estimate: Google Maps times need the family script (⚙)'}</span>
     </div>
   )
 }

@@ -40,6 +40,14 @@ export function leg(a: Point | undefined, b: Point | undefined, youngKids: boole
     : { minutes: Math.round(o.car), walkKm: 0.1, mode: 'car', km: d }
 }
 
+/** Picks the way to go from minutes per mode, with the same walking preference. */
+export function pick(o: Partial<Record<Mode, number>>): { mode: Mode; minutes: number } | null {
+  const ride = Math.min(o.transit ?? Infinity, o.car ?? Infinity)
+  if (o.walk != null && (ride === Infinity || o.walk <= ride + walkSlack(ride))) return { mode: 'walk', minutes: o.walk }
+  if (ride === Infinity) return null
+  return (o.transit ?? Infinity) <= (o.car ?? Infinity) ? { mode: 'transit', minutes: o.transit! } : { mode: 'car', minutes: o.car! }
+}
+
 export const MODE_NAME: Record<Mode, string> = { walk: 'walk', transit: 'transit', car: 'by car' }
 /** "12 min walk", "25 min by car". */
 export const legText = (l: Pick<Leg, 'minutes' | 'mode'>) => `${l.minutes} min ${MODE_NAME[l.mode]}`

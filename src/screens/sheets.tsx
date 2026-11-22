@@ -1,7 +1,7 @@
 // Small sheets: sort & filter, add a place, add to a day, pick a day, local rules.
 import { useState } from 'preact/hooks'
 import { Icon, Sheet } from '../ui'
-import { places, save, tripPlaces, trips } from '../lib/data'
+import { nowIn, places, save, tripPlaces, trips } from '../lib/data'
 import { close, open } from '../lib/nav'
 import { createStore } from '../lib/store'
 import { setDay } from '../lib/actions'
@@ -108,21 +108,25 @@ export function DaySheet({ trip, id }: { trip: Trip; id: string }) {
   const p = places.use()[id]
   if (!p) return null
   const n = tripDays(trip)
+  // Days already behind you aren't offered: you can't go back in time.
+  const first = Math.max(1, nowIn(trip).day)
   return (
     <Sheet title={`Day for ${p.name}`}>
+      {first > n ? <p class="muted">The trip is over.</p> : (
       <div class="list">
-        {Array.from({ length: n }, (_, i) => i + 1).map((d) => {
+        {Array.from({ length: n - first + 1 }, (_, i) => i + first).map((d) => {
           const date = dateOf(trip, d)
           const closed = hoursOn(p, date) === null || (p.fixed != null && !!p.booked && p.day != null && p.day !== d)
           const pl = planDay(trip, d, tripPlaces(trip.id))
           return (
             <button class="kv press" disabled={closed} style={closed ? { opacity: 0.5 } : undefined} onClick={() => { setDay(p.id, d); close() }}>
-              <span><b>Day {d}</b> · {WEEKDAY[weekday(date)]} {shortDate(date)}</span>
+              <span><b>{d === first && nowIn(trip).day === d ? 'Today' : `Day ${d}`}</b> · {WEEKDAY[weekday(date)]} {shortDate(date)}</span>
               <span class="v">{p.day === d ? <span class="chip ok">Here</span> : p.fixed != null && p.booked ? 'Booked on another day' : closed ? 'Closed' : `${pl.slots.filter((s) => s.kind === 'place').length} stops`}</span>
             </button>
           )
         })}
       </div>
+      )}
       {p.day != null && <button class="btn btn-quiet press" onClick={() => { setDay(p.id, null); close() }}>Not on a day</button>}
     </Sheet>
   )

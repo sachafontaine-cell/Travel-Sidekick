@@ -1,7 +1,7 @@
 // Every change the screens make, in one place, so Card, Plan, Ask and Rebalance all do the
 // same thing the same way (and each gets an Undo).
 import type { DayMeta, Place, Status, Trip } from './model'
-import { days, places, save, trips, tripPlaces, newId } from './data'
+import { days, nowIn, places, save, trips, tripPlaces, newId } from './data'
 import { between, byRank } from './rank'
 import { dayPlaces } from './planner'
 import { defaultFamily, PACE_DEFAULTS } from './people'
@@ -50,6 +50,9 @@ export function setMinutes(id: string, minutes: number) {
 export function setDay(id: string, day: number | null) {
   const p = one(id)
   if (!p || p.day === day) return
+  // No adding to a day that's already gone (from any screen, Ask included).
+  const t = trips.get()[p.trip]
+  if (day != null && t && day < nowIn(t).day) return
   if (day == null) return put({ ...p, day: null, fixed: p.booked ? p.fixed : null }, `${p.name} taken off Day ${p.day}`)
   const last = dayPlaces(tripPlaces(p.trip), day).at(-1)
   put({ ...p, day, dayRank: between(last?.dayRank, undefined), status: p.status === 'out' ? 'picked' : p.status === 'maybe' ? 'picked' : p.status }, `${p.name} added to Day ${day}`)

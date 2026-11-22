@@ -15,6 +15,37 @@ Mockups in `mockups/` use sample names; the live canvas has the real ones.
 - **"Almost sold out"** dropped (no data source) → "timed tickets: book ahead".
 - **Translator:** no built-in one. Trip tab has a **Google Translate ↗** link. Prep has **Before you go: download French in Google Translate** (checkbox + link), and the script emails a reminder 3 days before the trip.
 
+## 1b. Engineering review: app + script (Nov 22)
+**App**
+1. **The day planner is plain code, not AI.** It places items around bookings, opening hours, closing days, downtime, meals, start/end and the walking limit, in milliseconds. It powers Days, Rebalance, rain plan B and flight changes. Gemini only gives opinions (scores, why, tips) and answers Ask. Asking AI to plan the day would be slow and unreliable.
+2. **AI for opinions, Google for facts.** Each place is matched once to a Google place (location, hours, closing days) and cached. Scores come from Gemini; hours and locations never do.
+3. **Times are calculated, not stored.** Only the order and fixed bookings are saved; times are recomputed on every change. Dragging stays instant and times never go stale.
+4. **Each place needs a "time there"** for the planner (added to the Card, −/+).
+5. **Time zone = the destination's.** Before the trip the phone is on California time; the script also runs on California time. Everything uses Paris time.
+6. **"Another idea" and "What now?" pick from a ranked list on the phone**, so taps are instant. No AI call per tap.
+7. **Structured AI answers** (fixed JSON format), so the app never breaks on a chatty answer.
+8. **Dates fixed:** Jun 12–19 is 8 days, but the plan has 7. Trip is now Jun 12–18.
+
+**Sync between the two phones**
+9. Each change is saved as a small "edit" (who, when, what), not the whole trip. Two parents editing at once never wipe each other's work. List order uses sortable keys, so two reorders merge cleanly.
+10. Script calls use a plain-text POST (no browser pre-check) and the script locks while writing. Same trick as the Control Center.
+
+**Script**
+11. **Jobs:** nightly self-update + booking scan; 7:00 Paris time hours check; flight-change scan every 30 min during the trip; the "download French" reminder. All well inside Google's free daily limits.
+12. **Booking emails are cleaned before Gemini sees them:** passport and card numbers are removed (Gemini's free tier may be used by Google).
+13. **Only Sacha's inbox is read.** Bookings in Imose's inbox: forward them, or use the KAYAK calendar link.
+14. **Emails are never sent twice** (each alert has an ID).
+15. **Keys are locked down:** Gemini key limited to Gemini; Google Maps key limited to Places with a daily cap and a $1 budget alert, so it can't run up a bill.
+16. **Self-update trust:** whoever can push to this repo controls the script, so GitHub needs two-step login. The script only takes code from `main`.
+17. **App and script know each other's version**; a mismatch triggers the self-update.
+
+**Mockups fixed in this pass**
+- Trip dates Jun 12–18 (Trips, Setup, Today).
+- Card: "Time there" with −/+; tip no longer says 9 AM (before your 10:30 start).
+- New **Rebalance** sheet: one screen for Review, Fix it, rain and flight changes; each change can be unticked; Apply / Not now; Undo after.
+- Trips: **This app** section (this phone, Gemini key, hours check, email alerts) + version ↻. Keys and who-is-this-phone aren't trip settings, so they don't belong in Trip Setup.
+- Setup: budget, pace and crowd are real buttons.
+
 ## 2. Speed: the plan (top priority)
 Goal on the Pixel 7: opens in under 1 s, every tap answers in under 0.1 s, screens switch in under 0.15 s.
 

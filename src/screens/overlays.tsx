@@ -6,7 +6,7 @@ import { Card } from './card'
 import { Ask } from './ask'
 import { Rebalance } from './rebalance'
 import { AppSheet } from './settings'
-import { AddSheet, AddToDaySheet, DaySheet, FilterSheet, RulesSheet } from './sheets'
+import { AddSheet, AddToDaySheet, DaySheet, DiscoverSheet, FilterSheet, RulesSheet } from './sheets'
 import { SETUP_SHEETS } from './setup'
 
 export function Overlays({ trip }: { trip?: Trip }) {
@@ -27,6 +27,7 @@ export function Overlays({ trip }: { trip?: Trip }) {
         if (o.name === 'addday' && o.arg) return <AddToDaySheet trip={t} day={Number(o.arg)} />
         if (o.name === 'day' && o.arg) return <DaySheet trip={t} id={o.arg} />
         if (o.name === 'rules') return <RulesSheet trip={t} />
+        if (o.name === 'discover') return <DiscoverSheet trip={t} />
         return null
       })}
     </>

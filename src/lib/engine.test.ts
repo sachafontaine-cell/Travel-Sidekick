@@ -64,8 +64,8 @@ describe('day planner (sample Paris trip)', () => {
     const d3 = planDay(trip, 3, places)
     const names = d3.slots.map((s) => s.place?.name ?? s.kind)
     expect(names).toEqual(['Louvre (highlights tour)', 'Lunch · Le Fumoir', 'downtime', 'Sainte-Chapelle', 'Dinner · Bouillon Chartier'])
-    expect(clock(d3.slots[0].start)).toBe('9:30 AM')
-    expect(clock(d3.slots[1].start)).toBe('12:45 PM')
+    expect(clock(d3.slots[0].start)).toBe('9:30')
+    expect(clock(d3.slots[1].start)).toBe('12:45')
     expect(d3.slots[2].start).toBeGreaterThanOrEqual(d3.slots[1].end)
     expect(d3.slots[2].end - d3.slots[2].start).toBe(90)
     expect(d3.slots[4].start).toBe(18 * 60 + 30) // dinner waits for dinner time
@@ -98,7 +98,7 @@ describe('must-sees, rebalance and what now', () => {
     expect(c).toMatchObject({ done: 4, total: 9, daysLeft: 4 })
     const orsay = infos.find((i) => i.place.name === "Musée d'Orsay")!
     expect(orsay.state).toBe('risk')
-    expect(infos.find((i) => i.place.name.startsWith('Louvre'))!.line).toBe('Was planned at 9:30 AM. Done?')
+    expect(infos.find((i) => i.place.name.startsWith('Louvre'))!.line).toBe('Was planned at 9:30. Done?')
   })
   it('Plan my days fits checked places, drops unchecked ones, keeps today and before', () => {
     const tuileries = places.find((p) => p.name === 'Tuileries Garden')!

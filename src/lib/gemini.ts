@@ -61,7 +61,8 @@ export async function generate(key: string, model: string, body: Record<string, 
 export async function stream(key: string, model: string, body: Record<string, unknown>, onText: (all: string) => void, opts: { stallMs?: number; thinking?: boolean } = {}): Promise<string> {
   const { payload, thinking } = prepare(model, body, opts.thinking !== false)
   const ctrl = new AbortController()
-  let timer = setTimeout(() => ctrl.abort(), 30000)
+  // A search-grounded answer can take a while to start (it searches first).
+  let timer = setTimeout(() => ctrl.abort(), Math.max(30000, opts.stallMs ?? 0))
   const poke = () => { clearTimeout(timer); timer = setTimeout(() => ctrl.abort(), opts.stallMs ?? 25000) }
   let all = ''
   try {

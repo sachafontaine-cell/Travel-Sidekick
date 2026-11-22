@@ -164,11 +164,11 @@ await test('sample trip: set your own start time on the Card; Auto gives it back
   const t = p.getByLabel(/Start time/)
   await t.fill('15:00')
   await t.dispatchEvent('change')
-  await p.getByText('Eiffel Tower at 3:00 PM').waitFor()
+  await p.getByText('Eiffel Tower at 15:00').waitFor()
   await p.getByText('Set by you').waitFor()
   await p.keyboard.press('Escape')
   const row = p.locator('.slot', { hasText: 'Eiffel Tower' })
-  expect((await row.locator('.t').innerText()).trim() === '3:00', 'the day shows it at 3:00')
+  expect((await row.locator('.t').innerText()).trim() === '15:00', 'the day shows it at 15:00')
   await row.locator('.open').click()
   await p.getByRole('button', { name: 'Auto', exact: true }).click()
   await p.getByText('Set by the planner').waitFor()
@@ -246,8 +246,11 @@ async function fakeServices(p) {
     if (url.includes('/models?')) return r.fulfill({ json: { models: [{ name: 'models/gemini-9.9-flash', supportedGenerationMethods: ['generateContent'] }] } })
     if (url.includes('streamGenerateContent')) {
       // A refresh after the settings changed: the same places re-scored, plus one new fit.
-      const again = (r.request().postData() ?? '').includes('changed their trip settings')
-      const list = again ? [...PLACES.map((x) => x.name === 'Luxembourg Gardens' ? { ...x, sub: { ...x.sub, vibe: 2 } } : x), { ...PLACES[3], name: 'Jardin des Plantes', lat: 48.8440, lng: 2.3596 }] : PLACES
+      const post = r.request().postData() ?? ''
+      const again = post.includes('changed their trip settings')
+      // "Find more" searches Google (grounded) for one focus.
+      if (post.includes('Find up to 8 NEW')) expect(post.includes('google_search') && post.includes('turtle release'), 'Find more searches Google for what was typed')
+      const list = post.includes('Find up to 8 NEW') ? [{ ...PLACES[3], name: 'Sea turtle hatchling release', kind: 'outdoors', lat: 48.85, lng: 2.35 }] : again ? [...PLACES.map((x) => x.name === 'Luxembourg Gardens' ? { ...x, sub: { ...x.sub, vibe: 2 } } : x), { ...PLACES[3], name: 'Jardin des Plantes', lat: 48.8440, lng: 2.3596 }] : PLACES
       const lines = list.map((x) => JSON.stringify(x)).join('\n')
       const chunks = [lines.slice(0, 400), lines.slice(400, 1500), lines.slice(1500)]
       const body = chunks.map((c) => `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: c }] } }] })}\n\n`).join('')
@@ -257,7 +260,7 @@ async function fakeServices(p) {
   })
 }
 
-await test('new trip: setup, key, build the list (streamed), confirm must-sees, days planned; vibe change re-scores', async () => {
+await test('new trip: setup, key, build the list (streamed), confirm must-sees, days planned; vibe change re-scores; Find more', async () => {
   const p = await page()
   await fakeServices(p)
   await p.goto(BASE)
@@ -314,6 +317,13 @@ await test('new trip: setup, key, build the list (streamed), confirm must-sees, 
   const jp = after.find((x) => x.name === 'Jardin des Plantes')
   expect(jp && jp.status === 'maybe' && jp.fresh, 'new fit added, unchecked, tagged New')
   await p.getByText('New', { exact: true }).first().waitFor()
+  // Find more: type what we're after; it comes back unchecked, tagged New.
+  await p.getByRole('button', { name: 'Find more' }).click()
+  await p.getByPlaceholder(/Something specific/).fill('turtle release')
+  await p.getByRole('button', { name: 'Search', exact: true }).click()
+  await p.getByText(/Added 1, unchecked and tagged New: Sea turtle hatchling release/).waitFor({ timeout: 10000 })
+  await p.keyboard.press('Escape')
+  await p.getByText('Sea turtle hatchling release').first().waitFor()
   expect(p.errors.filter((e) => !/Failed to load resource/.test(e)).length === 0, 'no errors: ' + p.errors.join(' | '))
   await p.screenshot({ path: `${SHOTS}/new-trip-plan.png` })
   await p.context().close()

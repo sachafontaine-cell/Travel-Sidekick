@@ -42,6 +42,7 @@ export function tripBrief(t: Trip): string {
   const b = ['$', '$$', '$$$']
   return [
     `Destination: ${t.dest.name}. Dates: ${t.start} to ${t.end}.`,
+    t.base ? `Staying at: ${t.base.name} (${t.base.lat.toFixed(4)}, ${t.base.lng.toFixed(4)}). Favour good things close to it.` : '',
     `Group: ${groupLine(t)}. Travelers' ages: ${ages}. Group walking limit: ${groupLimit(t).miles} miles/day.`,
     `Vibe: ${describe(t.vibes, VIBE_NAMES)} (percent).`,
     `Budget: overall ${b[t.budget.all - 1]}${t.budget.lodging ? `, lodging ${b[t.budget.lodging - 1]}` : ''}${t.budget.food ? `, food ${b[t.budget.food - 1]}` : ''}${t.budget.activities ? `, activities ${b[t.budget.activities - 1]}` : ''}. Pace: ${t.pace}.`,
@@ -91,30 +92,41 @@ export function toPlace(raw: RawPlace, trip: Trip, rank: string): Place | null {
   }
 }
 
-/** Builds the list, streaming: `onPlace` gets each place as soon as its line arrives. */
-export async function buildList(trip: Trip, onPlace: (p: Place) => void): Promise<number> {
-  const prompt = `You are a family travel expert. Suggest 32 places for this trip.\n${tripBrief(trip)}\n${FIELDS}\nMix: the must-sees, worth-it sights for these vibes, 2-3 hidden gems, 4-5 meal spots near the sights, 3 snacks, and 1-2 famous tourist traps marked "trap".`
+/** What Google Search is for: the things a generic list misses. */
+const SEARCH = `Use Google Search to check what is real, open and happening on these exact dates. Include time-sensitive and seasonal experiences (wildlife such as sea-turtle hatchling releases or whale watching, festivals, night markets, sports, local events) and small local things near where they're staying that guidebooks miss. Only places that operate now, with accurate coordinates. Output only the JSON lines.`
+
+/** Streams JSON-lines places from a prompt, searching Google first; without search if that fails. */
+async function streamPlaces(prompt: string, trip: Trip, onRaw: (raw: RawPlace) => void, maxOutputTokens = 12000): Promise<number> {
   let count = 0
-  let rank: string | undefined
-  await useModel((key, model) => {
+  const run = (grounded: boolean) => useModel((key, model) => {
     let seen = 0
     count = 0
-    return stream(key, model, { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 12000 } }, (all) => {
+    const take = (line: string) => { const raw = jsonIn<RawPlace>(line, 'object'); if (raw && typeof raw.name === 'string') { count++; onRaw(raw) } }
+    const body = { contents: [{ role: 'user', parts: [{ text: grounded ? `${prompt}\n${SEARCH}` : prompt }] }], ...(grounded ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: 0.4, maxOutputTokens } }
+    return stream(key, model, body, (all) => {
       const lines = all.split('\n')
-      // Every complete line not yet handled.
-      for (; seen < lines.length - 1; seen++) {
-        const raw = jsonIn<RawPlace>(lines[seen], 'object')
-        if (!raw) continue
-        rank = between(rank, undefined)
-        const p = toPlace(raw, trip, rank)
-        if (p) { count++; onPlace(p) }
-      }
-    }).then((all) => {
-      const last = jsonIn<RawPlace>(all.split('\n').at(-1) ?? '', 'object')
-      if (last) { rank = between(rank, undefined); const p = toPlace(last, trip, rank); if (p) { count++; onPlace(p) } }
-      if (!count) throw new AiError('Gemini did not return any places. Try again.', 0, true)
-    })
+      for (; seen < lines.length - 1; seen++) take(lines[seen])
+    }, { stallMs: grounded ? 60000 : 25000 }).then((all) => { take(all.split('\n').at(-1) ?? '') })
   })
+  try { await run(true) } catch (e) { if (count) throw e; await run(false) }
+  if (!count) throw new AiError('Gemini did not return any places. Try again.', 0, true)
+  void trip
+  return count
+}
+
+/** "Find more": up to 8 new places for one focus (near us, on our dates, nature…), searching Google. */
+export async function discover(trip: Trip, focus: string, near: { lat: number; lng: number } | undefined, names: string[], onPlace: (p: Place) => void): Promise<number> {
+  const prompt = `You are a family travel expert who knows this place like a local. Find up to 8 NEW places or experiences for this trip: ${focus}.${near ? ` They are at ${near.lat.toFixed(4)}, ${near.lng.toFixed(4)} right now.` : ''}\n${tripBrief(trip)}\n${FIELDS}\nAlready in their list (don't repeat): ${names.join('; ')}`
+  let rank: string | undefined
+  return streamPlaces(prompt, trip, (raw) => { rank = between(rank, undefined); const p = toPlace(raw, trip, rank); if (p) onPlace(p) }, 6000)
+}
+
+/** Builds the list, streaming: `onPlace` gets each place as soon as its line arrives. */
+export async function buildList(trip: Trip, onPlace: (p: Place) => void): Promise<number> {
+  const prompt = `You are a family travel expert who knows this place like a local. Suggest 32 places and experiences for this trip.\n${tripBrief(trip)}\n${FIELDS}\nMix: the must-sees, worth-it sights for these vibes, 3-4 hidden gems and local experiences near where they're staying, anything seasonal or special on their dates, 4-5 meal spots, 3 snacks, and 1-2 famous tourist traps marked "trap".`
+  let rank: string | undefined
+  let count = 0
+  await streamPlaces(prompt, trip, (raw) => { rank = between(rank, undefined); const p = toPlace(raw, trip, rank); if (p) { count++; onPlace(p) } })
   return count
 }
 

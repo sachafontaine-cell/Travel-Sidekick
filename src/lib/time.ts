@@ -2,13 +2,10 @@
 
 export const pad = (n: number) => String(n).padStart(2, '0')
 
-/** Minutes after midnight → "9:30 AM" (or "9:30" when short). */
-export function clock(min: number, short = false): string {
+/** Minutes after midnight → "9:30", "14:45" (24-hour clock). */
+export function clock(min: number, _short = false): string {
   const m = ((Math.round(min) % 1440) + 1440) % 1440
-  const h = Math.floor(m / 60), mm = m % 60
-  const h12 = h % 12 || 12
-  if (short) return `${h12}:${pad(mm)}`
-  return `${h12}:${pad(mm)} ${h < 12 ? 'AM' : 'PM'}`
+  return `${Math.floor(m / 60)}:${pad(m % 60)}`
 }
 
 /** "9:30" or "13:45" → minutes. */

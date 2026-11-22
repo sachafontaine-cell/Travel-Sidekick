@@ -85,7 +85,7 @@ function All({ trip }: { trip: Trip }) {
         <div class="card hero">
           <div class="between"><span class="h2">Must-sees {c.done} of {c.total}</span><span class="muted">{c.daysLeft} day{c.daysLeft === 1 ? '' : 's'} left</span></div>
           <div class="bar" role="progressbar" aria-valuenow={c.done} aria-valuemax={c.total} aria-label="Must-sees done"><span style={{ width: `${(c.done / c.total) * 100}%` }} /></div>
-          {checked && <span class="muted small">Hours checked with Google · {new Date(checked).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>}
+          {checked && <span class="muted small">Hours checked with Google · {new Date(checked).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })}</span>}
           {risky.map((i) => (
             <button class="between press" style={{ minHeight: '48px', textAlign: 'left' }} onClick={() => open({ kind: 'card', place: i.place.id })}>
               <span class="grow"><b>{i.place.name}</b><br /><span class="muted small">{i.line}</span></span><StateChip s={i.state} />
@@ -98,8 +98,9 @@ function All({ trip }: { trip: Trip }) {
       <RefreshBanner trip={trip} />
 
       <div class="row">
-        <button class={`pill press${custom ? ' dark' : ''}`} onClick={() => open({ kind: 'sheet', name: 'filter' })}><Icon.filter />{custom ? 'Filtered' : 'Sort & filter'}</button>
+        <button class={`pill press${custom ? ' dark' : ''}`} aria-label="Sort & filter" onClick={() => open({ kind: 'sheet', name: 'filter' })}><Icon.filter />{custom ? 'Filtered' : 'Filter'}</button>
         <span class="grow" />
+        <button class="pill press" onClick={() => open({ kind: 'sheet', name: 'discover' })}><Icon.search />Find more</button>
         <button class="pill press" onClick={() => open({ kind: 'sheet', name: 'add', arg: trip.id })}><Icon.plus />Add</button>
       </div>
 

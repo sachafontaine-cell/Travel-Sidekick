@@ -1,11 +1,12 @@
 // Small sheets: sort & filter, add a place, add to a day, pick a day, local rules.
-import { useState } from 'preact/hooks'
-import { Icon, Sheet } from '../ui'
+import { useEffect, useState } from 'preact/hooks'
+import { Icon, Sheet, Spinner } from '../ui'
 import { nowIn, places, save, tripPlaces, trips } from '../lib/data'
 import { close, open } from '../lib/nav'
 import { createStore } from '../lib/store'
 import { setDay } from '../lib/actions'
-import { scorePlace } from '../lib/ai'
+import { discover, scorePlace } from '../lib/ai'
+import { here, locate } from '../lib/here'
 import { between, byRank } from '../lib/rank'
 import { dateOf, dayPlaces, hoursOn, planDay, tripDays } from '../lib/planner'
 import { km } from '../lib/geo'
@@ -100,6 +101,53 @@ export function AddToDaySheet({ trip, day }: { trip: Trip; day: number }) {
         </div>
       )}
       <button class="link press" onClick={() => { close(); setTimeout(() => open({ kind: 'sheet', name: 'add', arg: trip.id + '|' + day }), 0) }}>Something else…</button>
+    </Sheet>
+  )
+}
+
+const FOCUS: [string, string][] = [
+  ['Near us', 'great things within a short walk or drive of where they are, especially ones only locals know'],
+  ['On our dates', 'things that happen only on or around their dates: seasonal wildlife (e.g. sea-turtle hatchling releases, whale watching), festivals, markets, events, sports'],
+  ['Nature & wildlife', 'nature, beaches, wildlife and outdoor experiences'],
+  ['Hidden gems', 'hidden gems and local favourites that tourists miss'],
+  ['Free', 'free or nearly free things worth doing'],
+  ['Rainy day', 'indoor things for a rainy or very hot day'],
+]
+
+/** "Find more": Gemini searches Google for one focus and adds up to 8 new places, unchecked and tagged New. */
+export function DiscoverSheet({ trip }: { trip: Trip }) {
+  const [text, setText] = useState('')
+  const [state, setState] = useState<{ busy?: string; done?: string; err?: string }>({})
+  const loc = here.use()
+  useEffect(() => { void locate() }, [])
+  const run = async (label: string, focus: string) => {
+    setState({ busy: label })
+    const all = tripPlaces(trip.id)
+    const names = new Set(all.map((p) => p.name.toLowerCase()))
+    let last = all.sort(byRank).at(-1)?.rank
+    const found: string[] = []
+    try {
+      await discover(trip, focus, loc.pt ?? trip.base, all.map((p) => p.name), (p) => {
+        if (names.has(p.name.toLowerCase()) || p.badge === 'trap' || found.length >= 8) return
+        names.add(p.name.toLowerCase())
+        last = between(last, undefined)
+        save('place', [{ ...p, rank: last, status: 'maybe', must: false, fresh: true }])
+        found.push(p.name)
+      })
+      setState({ done: found.length ? `Added ${found.length}, unchecked and tagged New: ${found.join(', ')}.` : 'Nothing new found for that. Try another.' })
+    } catch (e) { setState({ err: e instanceof Error ? e.message : 'Search failed.' }) }
+  }
+  return (
+    <Sheet title="Find more">
+      <p class="muted small">Gemini searches Google for your dates and where you are.</p>
+      <div class="chips">{FOCUS.map(([l, f]) => <button class="pill press" disabled={!!state.busy} onClick={() => run(l, f)}>{l}</button>)}</div>
+      <div class="row">
+        <input class="field grow" placeholder="Something specific, e.g. turtle release" value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter' && text.trim()) void run(text.trim(), `specifically: ${text.trim()}`) }} />
+        <button class="btn btn-primary btn-sm press" disabled={!text.trim() || !!state.busy} onClick={() => run(text.trim(), `specifically: ${text.trim()}`)}>Search</button>
+      </div>
+      {state.busy && <div class="row muted"><Spinner />Searching: {state.busy}… (up to a minute)</div>}
+      {state.done && <p class="answer">{state.done}</p>}
+      {state.err && <p class="answer err">{state.err}</p>}
     </Sheet>
   )
 }

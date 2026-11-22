@@ -84,7 +84,7 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
   const h = hoursOn(p, date)
   const slot = day ? plansFor(trip)[day - 1]?.slots.find((s) => s.id === p.id) : undefined
   const group = p.price * Math.max(1, trip.people.length)
-  const checked = p.hours?.source === 'google' && p.hours.checkedAt ? new Date(p.hours.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : null
+  const checked = p.hours?.source === 'google' && p.hours.checkedAt ? new Date(p.hours.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hourCycle: 'h23' }) : null
   // Flights and other bookings that aren't activities: no score, price, photos or opening hours.
   const ticket = !!p.booked && p.kind === 'other'
   const maps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.name}, ${trip.dest.name}`)}`

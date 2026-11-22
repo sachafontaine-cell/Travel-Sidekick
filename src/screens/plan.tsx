@@ -124,7 +124,10 @@ function All({ trip }: { trip: Trip }) {
         </button>
       )}
       <div class="section-h"><span class="label">Activities · {ticked} checked</span>{list.length > 0 && <span class="muted small">Check what you want</span>}</div>
-      <p class={`small ${cap.left < -60 ? 'warn-text' : 'muted'}`} style={{ marginTop: '-8px' }}>{capacityText(cap)}</p>
+      <div class="between" style={{ marginTop: '-8px' }}>
+        <span class={`small ${cap.left < -60 ? 'warn-text' : 'muted'}`}>{capacityText(cap)}</span>
+        <button class="link small press" onClick={() => open({ kind: 'sheet', name: 'review' })}>Check my list</button>
+      </div>
       {f.group === false ? <Section trip={trip} list={list} status="picked" draggable={f.sort === 'mine'} />
         : GROUPS.map(([name, key]) => {
           const g = list.filter((p) => groupOf(p) === key)

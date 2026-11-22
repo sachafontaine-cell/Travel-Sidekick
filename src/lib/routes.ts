@@ -1,7 +1,7 @@
 // Real travel times from where you are: Google Maps directions through the family script (free).
 // Looked up when a place's card opens, kept while the app is open (you move, so not saved).
 // Until then, or without the script, the app shows its own estimate, marked "≈".
-import { call, connected, syncState, SCRIPT_NEEDED } from './sync'
+import { call, connected, syncState } from './sync'
 import { km, leg, options, pick, type Mode } from './geo'
 import { youngKids } from './people'
 import type { Place, Trip } from './model'
@@ -37,7 +37,7 @@ export function travelFrom(trip: Trip, p: Place, origin: Point): Travel {
 /** Real times from where the phone is, for one place (when its card opens). */
 export async function routeHere(trip: Trip, p: Place, pt: Point): Promise<void> {
   const k = spot(pt) + '|' + p.id
-  if (!connected() || (syncState.get().script ?? 0) < SCRIPT_NEEDED || hereTimes.get()[k] || asked.has(k)) return
+  if (!connected() || (syncState.get().script ?? 0) < 6 || hereTimes.get()[k] || asked.has(k)) return
   asked.add(k)
   const res = await call<{ routes: Record<string, Times> }>({ op: 'routes', from: pt, depart: Date.now() + 5 * 60000, to: [{ id: p.id, lat: p.lat, lng: p.lng }] }, 60000)
   const r = res.routes?.[p.id]

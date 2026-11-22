@@ -9,6 +9,7 @@ import { checkHours, localRules } from './ai'
 import { dateOf, tripDays } from './planner'
 import type { Place, Trip } from './model'
 import { findPhotos, wantsPhoto } from './photos'
+import { locateAll } from './locate'
 
 // Each job runs one at a time, and at most every `every` ms, even when it fails (no retry storm
 // while you move between screens; it tries again later).
@@ -75,6 +76,7 @@ function run() {
   void once('wx' + trip.id + now.date, () => refreshWeather(trip, now.day >= 1 && now.day <= tripDays(trip) ? now.date : trip.start, Math.floor(now.min / 60)))
   void once('hours' + trip.id, () => hoursJob(trip), 3 * 3600000)
   void once('photos' + trip.id, () => photosJob(trip), 5 * 60000)
+  void once('locate' + trip.id, () => (DEMO ? Promise.resolve() : locateAll(trip)), 2 * 60000)
   void once('rules' + trip.id, async () => {
     if (DEMO || !trip.built || trip.rules?.length || !settings.get().geminiKey) return
     const rules = await localRules(trip)

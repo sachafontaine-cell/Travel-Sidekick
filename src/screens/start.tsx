@@ -5,6 +5,7 @@ import { save, settings, trips, tripPlaces } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
 import { scorePlace, listKey } from '../lib/ai'
 import { deepSearch } from '../lib/deep'
+import { locateAll } from '../lib/locate'
 import { autoPlan } from '../lib/rebalance'
 import { connected, scanEmail } from '../lib/sync'
 import { between, spread } from '../lib/rank'
@@ -80,6 +81,7 @@ export function Start({ trip }: { trip: Trip }) {
     const final = autoPlan(trip, found.map((p) => ({ ...p, day: p.fixed != null ? p.day : null })))
     save('place', final)
     save('trip', [{ ...trips.get()[trip.id], built: true, listFor: listKey(trips.get()[trip.id]) }])
+    void locateAll(trips.get()[trip.id]).catch(() => {})
     go(tripPath(trip.id, 'plan'), true)
   }
 

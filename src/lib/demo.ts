@@ -75,7 +75,7 @@ export function demoTrip(): { trip: Trip; places: Place[] } {
     return {
       id: `demo-${i}`, trip: T, name: s.name, kind: s.kind, lat: s.lat, lng: s.lng, badge: s.badge, must: !!s.must,
       worth: worthOf({ value: s.value, sub: { iconic: s.sub[0], vibe: s.sub[1], hassle: s.sub[2], kid: s.sub[3] } }, true), scoreV: 2, value: s.value, sub: { iconic: s.sub[0], vibe: s.sub[1], hassle: s.sub[2], kid: s.sub[3] },
-      rec: s.rec, recText: s.recText, desc: s.desc, good: s.good, skipIf: s.skipIf, why: s.why, tip: s.tip, price: s.price, minutes: s.minutes, suggested: s.minutes,
+      loc: { src: 'google', exact: true, address: `${s.name.split(' · ').at(-1)}, Paris`, at }, rec: s.rec, recText: s.recText, desc: s.desc, good: s.good, skipIf: s.skipIf, why: s.why, tip: s.tip, price: s.price, minutes: s.minutes, suggested: s.minutes,
       indoor: !!s.indoor, hours: s.h ? { ...s.h, checkedAt: Date.now() - 3 * 3600000 } : undefined,
       status: s.status ?? 'picked', rank: ranks[i], day: s.day ?? null, dayRank: s.day ? 'b' + String.fromCharCode(97 + (s.o ?? n)) : undefined,
       fixed: s.fixed ? hm(s.fixed) : null, booked: s.booked, done: s.done, at,

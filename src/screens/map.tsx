@@ -35,7 +35,7 @@ function visible(all: Place[], f: MapFilters): Place[] {
 
 const pinIcon = (p: Place, selected: boolean) => L.divIcon({
   className: '',
-  html: `<span class="pin${p.status === 'picked' ? ' on' : ''}${selected ? ' sel' : ''}" style="--c:${COLOR[groupOf(p)]}">${p.must ? '★' : ''}</span>`,
+  html: `<span class="pin${p.status === 'picked' ? ' on' : ''}${selected ? ' sel' : ''}${!p.loc || p.loc.src === 'none' ? ' guess' : ''}" style="--c:${COLOR[groupOf(p)]}">${p.must ? '★' : ''}</span>`,
   iconSize: [28, 28], iconAnchor: [14, 14],
 })
 

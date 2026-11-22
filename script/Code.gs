@@ -10,10 +10,11 @@
 //              calendar become bookings in their trip; other trips are suggested, never added
 //   hourly     7:00 destination time: checks must-see hours with Google, emails if one is closed
 //              3 days before a trip: emails "download the language in Google Translate"
+//   locate     where each place really is (Google Maps), since Gemini only guesses coordinates
 //   routes     real Google Maps times from the hotel (walk, transit, car), free through this script
 //   nightly    updates this script from the repository when a newer version is published
 
-var VERSION = 6
+var VERSION = 7
 var REPO_RAW = 'https://raw.githubusercontent.com/sachafontaine-cell/Travel-Sidekick/main/script/'
 var APP_URL = 'https://sachafontaine-cell.github.io/Travel-Sidekick/'
 
@@ -63,11 +64,43 @@ function doPost(e) {
     if (body.op === 'dismiss') { dismiss(String(body.id || '')); return out({ ok: true }) }
     if (body.op === 'update') return out(selfUpdate())
     if (body.op === 'routes') return out(routes(body))
+    if (body.op === 'locate') return out(locate(body))
     if (body.op === 'ping') return out({ v: VERSION })
     return out({ error: 'Unknown request' })
   } catch (err) {
     return out({ error: String(err && err.message || err) })
   }
+}
+
+// ---------- Locations (Google Maps, free through Apps Script) ----------
+
+/**
+ * Finds each place by name near the trip (Google Maps), up to 15 per call. Answers only within
+ * 120 km of the trip's centre, so a same-name place elsewhere is never taken.
+ */
+function locate(body) {
+  var c = body.center || {}
+  var res = {}
+  ;(body.places || []).slice(0, 15).forEach(function (p) {
+    try {
+      var g = Maps.newGeocoder().setBounds(Number(c.lat) - 0.6, Number(c.lng) - 0.6, Number(c.lat) + 0.6, Number(c.lng) + 0.6)
+        .geocode(String(p.name) + ', ' + String(body.near || ''))
+      var best = null
+      ;(g && g.results || []).forEach(function (r) {
+        var l = r.geometry && r.geometry.location
+        if (!l || best) return
+        var d = kmBetween(Number(c.lat), Number(c.lng), l.lat, l.lng)
+        if (d <= 120) best = { lat: l.lat, lng: l.lng, address: r.formatted_address, exact: !r.partial_match && (r.types || []).some(function (t) { return /establishment|point_of_interest|natural_feature|park|tourist_attraction|premise/.test(t) }) }
+      })
+      res[String(p.id)] = best || { none: true }
+    } catch (e) { res[String(p.id)] = { error: String(e && e.message || e) } }
+  })
+  return { ok: true, places: res }
+}
+
+function kmBetween(a, b, c, d) {
+  var r = Math.PI / 180, x = Math.sin((c - a) * r / 2), y = Math.sin((d - b) * r / 2)
+  return 12742 * Math.asin(Math.sqrt(x * x + Math.cos(a * r) * Math.cos(c * r) * y * y))
 }
 
 // ---------- Routes (Google Maps, free through Apps Script) ----------

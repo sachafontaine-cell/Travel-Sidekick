@@ -266,7 +266,7 @@ textarea.field { height: auto; padding: 10px 12px; resize: vertical; line-height
 .mode.on { background: var(--primary); color: var(--on-primary); font-weight: 600; }
 
 /* Plan → Map */
-.mapwrap { position: relative; }
+.mapwrap { position: relative; isolation: isolate; z-index: 0; }
 .mapbox { height: max(340px, calc(100dvh - 330px)); border-radius: 16px; overflow: hidden; border: 1px solid var(--border); background: var(--tile); z-index: 0; }
 .mapbox.loading { display: flex; align-items: center; justify-content: center; }
 .mapfilters .strip { margin: 0; padding: 0; }
@@ -292,3 +292,7 @@ textarea.field { height: auto; padding: 10px 12px; resize: vertical; line-height
 .decide-foot { position: sticky; bottom: -16px; margin: 0 -16px -16px; padding: 10px 16px 16px; background: var(--bg); border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .decide-btns { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 8px; width: 100%; }
 .decide-cta { display: flex; align-items: center; gap: 10px; border-color: var(--gold); }
+.pin.guess { border-style: dashed; opacity: .75; }
+.clock24 { display: inline-flex; align-items: center; gap: 2px; padding: 0 6px; min-height: 48px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+.clock24.custom { border: 2px solid var(--gold); }
+.clock24 select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; font: inherit; font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); padding: 6px 4px; text-align: center; }

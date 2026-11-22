@@ -9,6 +9,7 @@ import { AppSheet } from './settings'
 import { AddSheet, AddToDaySheet, DaySheet, DiscoverSheet, FilterSheet, RulesSheet } from './sheets'
 import { SETUP_SHEETS } from './setup'
 import { Decide } from './decide'
+import { ReviewSheet } from './review'
 
 export function Overlays({ trip }: { trip?: Trip }) {
   const list = overlays.use()
@@ -30,6 +31,7 @@ export function Overlays({ trip }: { trip?: Trip }) {
         if (o.name === 'rules') return <RulesSheet trip={t} />
         if (o.name === 'discover') return <DiscoverSheet trip={t} />
         if (o.name === 'decide') return <Decide trip={t} />
+        if (o.name === 'review') return <ReviewSheet trip={t} />
         return null
       })}
     </>

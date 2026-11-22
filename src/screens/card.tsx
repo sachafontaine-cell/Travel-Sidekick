@@ -4,11 +4,12 @@ import { useEffect, useState } from 'preact/hooks'
 import { BadgeFull, Dialog, Icon, Stepper } from '../ui'
 import { nowIn, places, plansFor, save, settings } from '../lib/data'
 import { fillAbout } from '../lib/about'
+import { locateAll } from '../lib/locate'
 import { hasKids, weights } from '../lib/score'
 import { close, open, replaceTop } from '../lib/nav'
 import { setDone, setMinutes, setMust, setStatus, setTime } from '../lib/actions'
 import { dateOf, hoursOn } from '../lib/planner'
-import { clock, duration, pad, parseClock } from '../lib/time'
+import { clock, duration, pad } from '../lib/time'
 import { price } from '../lib/money'
 import type { Place, Trip } from '../lib/model'
 import { legText, type Mode } from '../lib/geo'
@@ -77,9 +78,27 @@ export function Votes({ p }: { p: Place }) {
   return <p class="small">{others.map(([who, v]) => `${who} ${VOTE[v]}`).join(' · ')}</p>
 }
 
+/** Where it is, and whether that was checked on a map (Gemini's own coordinates can be off). */
+function Where({ p }: { p: Place }) {
+  const l = p.loc
+  if (l?.src === 'google' || l?.src === 'osm') return <p class="muted small" style={{ marginTop: '-6px' }}>📍 {l.address ?? 'On the map'}{l.exact === false ? ' (area only)' : ''}</p>
+  return <p class="small warn-text" style={{ marginTop: '-6px' }}>{l?.src === 'none' ? 'Not found on Google Maps: its spot on the map may be off' : 'Checking where it is…'}</p>
+}
+
 const tried = new Set<string>()
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
-const hhmm = (m: number) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`
+/** 24-hour time as two pickers (hour, then minutes in 5s): phones' own time boxes may show AM/PM. */
+function Clock24({ label, value, custom, onChange }: { label: string; value: number; custom: boolean; onChange: (v: number) => void }) {
+  const h = Math.floor(value / 60) % 24, m = value % 60
+  const mins = [...new Set([...Array.from({ length: 12 }, (_, i) => i * 5), m])].sort((a, b) => a - b)
+  return (
+    <span class={`clock24${custom ? ' custom' : ''}`} role="group" aria-label={label}>
+      <select aria-label="Hour" value={h} onChange={(e) => onChange(Number((e.target as HTMLSelectElement).value) * 60 + m)}>{Array.from({ length: 24 }, (_, i) => <option value={i}>{pad(i)}</option>)}</select>
+      <b>:</b>
+      <select aria-label="Minutes" value={m} onChange={(e) => onChange(h * 60 + Number((e.target as HTMLSelectElement).value))}>{mins.map((x) => <option value={x}>{pad(x)}</option>)}</select>
+    </span>
+  )
+}
 const REC = { pay: 'Pay for it', cheaper: 'Do the cheaper version', skip: 'Skip it' }
 
 export function Card({ trip, id }: { trip: Trip; id: string }) {
@@ -90,7 +109,7 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
   // "New" (from a refresh) goes away once you've looked.
   useEffect(() => { if (p?.fresh) { const { fresh: _, ...rest } = p; save('place', [rest]) } }, [id])
   // A description for your group (and Great for / Skip if) the first time the card opens.
-  useEffect(() => { if (p) void fillAbout(trip, [p]) }, [id])
+  useEffect(() => { if (p) { void fillAbout(trip, [p]); void locateAll(trip, [p]).catch(() => {}) } }, [id])
   if (!p) return null
   const now = nowIn(trip)
   const day = p.day ?? null
@@ -112,6 +131,7 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
       </div>
       {!ticket && <Photos p={p} maps={maps} />}
       <h2 class="h2">{p.name}</h2>
+      {!ticket && <Where p={p} />}
       {ticket && <p class="muted">{p.booked}{p.why ? ` · ${p.why}` : ''}</p>}
 
       {ticket ? null : p.scoring ? <p class="muted">Scoring… a few seconds.</p> : (
@@ -141,8 +161,8 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
       )}
       {p.status !== 'out' && day != null && (slot || p.fixed != null) && (
         <div class="timerow">
-          <label class="grow" for={`t-${p.id}`}><span class="strong">Start time</span><br /><span class="muted small">{p.fixed != null ? (p.booked ? 'Booked time' : 'Set by you') : 'Set by the planner'}</span></label>
-          <input id={`t-${p.id}`} class={`field timefield${p.fixed != null ? ' custom' : ''}`} type="time" step={300} value={hhmm(p.fixed ?? slot!.start)} onChange={(e) => { const v = parseClock((e.target as HTMLInputElement).value); if (v != null) setTime(trip, p.id, v) }} />
+          <span class="grow"><span class="strong">Start time</span><br /><span class="muted small">{p.fixed != null ? (p.booked ? 'Booked time' : 'Set by you') : 'Set by the planner'}</span></span>
+          <Clock24 label={`Start time of ${p.name}`} value={p.fixed ?? slot!.start} custom={p.fixed != null} onChange={(v) => setTime(trip, p.id, v)} />
           {p.fixed != null && !p.booked && <button class="btn btn-quiet btn-sm press" onClick={() => setTime(trip, p.id, null)}>Auto</button>}
         </div>
       )}

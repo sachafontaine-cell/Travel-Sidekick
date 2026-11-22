@@ -163,9 +163,8 @@ await test('sample trip: set your own start time on the Card; Auto gives it back
   const p = await page()
   await p.goto(BASE + '?demo#/t/demo-paris/plan/4')
   await p.locator('.slot .open', { hasText: 'Eiffel Tower' }).click()
-  const t = p.getByLabel(/Start time/)
-  await t.fill('15:00')
-  await t.dispatchEvent('change')
+  await p.getByLabel('Hour').selectOption('15')
+  await p.getByLabel('Minutes').selectOption('0')
   await p.getByText('Eiffel Tower at 15:00').waitFor()
   await p.getByText('Set by you').waitFor()
   await p.keyboard.press('Escape')
@@ -323,6 +322,12 @@ async function fakeServices(p) {
       if (!again) expect(post.includes('google_search'), 'searches Google')
       passes.push(post)
       const typed = post.includes('specifically: turtle release')
+      // "Check my list": a verdict, one missing place, one that doesn't fit, one to double-check.
+      if (post.includes("Review this family's list")) {
+        const lines = [{ type: 'summary', text: 'Strong on museums, light on things for the 10-year-old.' }, { type: 'missing', ...PLACES[3], name: 'Sainte-Chapelle', kind: 'sight', lat: 48.8554, lng: 2.345 }, { type: 'drop', name: 'Bouillon Chartier', reason: 'Long queue at dinner time with kids.' }, { type: 'check', name: 'Louvre', reason: 'Closed Tuesdays.' }]
+        const body = `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: lines.map((x) => JSON.stringify(x)).join('\n') }] } }] })}\n\n`
+        return r.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
+      }
       // The "map" pass judges real nearby places: it keeps the Jardin des Plantes from OpenStreetMap.
       const fromMap = post.includes('from OpenStreetMap and Wikipedia') && post.includes('Jardin des Plantes') ? [{ ...PLACES[3], name: 'Jardin des Plantes', lat: 48.8440, lng: 2.3596 }] : []
       const list = typed ? [{ ...PLACES[3], name: 'Sea turtle hatchling release', kind: 'outdoors', lat: 48.85, lng: 2.35 }] : again ? [...PLACES.map((x) => x.name === 'Luxembourg Gardens' ? { ...x, sub: { ...x.sub, vibe: 2 } } : x), { ...PLACES[3], name: 'Parc Monceau', lat: 48.8797, lng: 2.3091 }] : [...PLACES, ...fromMap]
@@ -335,7 +340,7 @@ async function fakeServices(p) {
   })
 }
 
-await test('new trip: setup, key, build the list (streamed), confirm must-sees, days planned; vibe change re-scores; Find more', async () => {
+await test('new trip: setup, key, build the list (streamed), confirm must-sees, days planned; vibe change re-scores; Find more; Check my list', async () => {
   const p = await page()
   await fakeServices(p)
   await p.goto(BASE)
@@ -404,6 +409,18 @@ await test('new trip: setup, key, build the list (streamed), confirm must-sees, 
   await p.getByText(/Added 1, unchecked and tagged New: Sea turtle hatchling release/).waitFor({ timeout: 10000 })
   await p.keyboard.press('Escape')
   await p.getByText('Sea turtle hatchling release').first().waitFor()
+  // Check my list: verdict, Add what's missing, Skip what doesn't fit.
+  await p.getByRole('button', { name: 'Check my list' }).click()
+  await p.getByText('Strong on museums, light on things for the 10-year-old.').waitFor({ timeout: 10000 })
+  const review = p.getByRole('dialog', { name: 'Check my list' })
+  await review.locator('.kv', { hasText: 'Sainte-Chapelle' }).getByRole('button', { name: 'Add' }).click()
+  await review.getByText('Added', { exact: true }).waitFor()
+  await review.locator('.kv', { hasText: 'Bouillon Chartier' }).getByRole('button', { name: 'Skip it' }).click()
+  await review.locator('.kv', { hasText: 'Bouillon Chartier' }).getByText('Skipped').waitFor()
+  await review.getByText('Closed Tuesdays.').waitFor()
+  await p.keyboard.press('Escape')
+  const reviewed = await storedPlaces(p)
+  expect(reviewed.find((x) => x.name === 'Sainte-Chapelle')?.fresh && reviewed.find((x) => x.name === 'Bouillon Chartier').status === 'out', 'added the missing one, skipped the poor fit')
   expect(p.errors.filter((e) => !/Failed to load resource/.test(e)).length === 0, 'no errors: ' + p.errors.join(' | '))
   await p.screenshot({ path: `${SHOTS}/new-trip-plan.png` })
   await p.context().close()

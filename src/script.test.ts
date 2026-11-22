@@ -40,7 +40,8 @@ function world(fetchImpl: (url: string, opts: any) => { code: number; body: stri
     })(),
     CacheService: { getScriptCache: () => { const m: Record<string, string> = {}; return { get: (k: string) => m[k] ?? null, put: (k: string, v: string) => { m[k] = v } } } },
     Maps: {
-      newGeocoder: () => ({ geocode: () => ({ status: 'OK', results: [{ geometry: { location: { lat: 48.86, lng: 2.33 } } }] }) }),
+      // Geocoder: a real spot for names it knows; a same-name place far away for "Faraway".
+      newGeocoder: () => { const g: any = { setBounds: () => g, geocode: (q: string) => q.startsWith('Nowhere') ? { status: 'ZERO_RESULTS', results: [] } : { status: 'OK', results: [{ geometry: { location: q.startsWith('Faraway') ? { lat: 40.7, lng: -74 } : { lat: 48.86, lng: 2.33 } }, formatted_address: 'Somewhere, Paris', types: ['tourist_attraction'] }] } }; return g },
       // Directions: walking 1 km = 14 min; transit has no timetable at the trip date (only now); driving has traffic.
       DirectionFinder: { Mode: { WALKING: 'walking', TRANSIT: 'transit', DRIVING: 'driving' } },
       newDirectionFinder: () => { const q: any = {}; const f: any = { setOrigin: () => f, setDestination: () => f, setMode: (m: string) => { q.mode = m; return f }, setDepart: (d: Date) => { q.depart = d; return f },
@@ -67,6 +68,13 @@ describe('family script', () => {
     expect(r.routes.p1).toMatchObject({ walk: 14, transit: 12, car: 10, km: 1.4, walkKm: 1 })
   })
 
+  it('finds where places really are on Google Maps, never a same-name place far away', () => {
+    const r = w.post({ k: 'family-key-123', op: 'locate', near: 'Paris, France', center: { lat: 48.85, lng: 2.35 }, places: [{ id: 'a', name: 'Louvre' }, { id: 'b', name: 'Faraway Diner' }, { id: 'c', name: 'Nowhere Café' }] })
+    expect(r.places.a).toMatchObject({ lat: 48.86, lng: 2.33, address: 'Somewhere, Paris', exact: true })
+    expect(r.places.b).toEqual({ none: true })
+    expect(r.places.c).toEqual({ none: true })
+  })
+
   it('refuses a wrong family key', () => {
     expect(w.post({ k: 'nope', op: 'sync' })).toEqual({ error: 'Wrong family key' })
   })
@@ -81,7 +89,7 @@ describe('family script', () => {
     w.tick()
     const c = w.post({ k: 'family-key-123', op: 'sync', since: a.now, put: [{ coll: 'place', id: 'p2', at: 200, data: { id: 'p2' } }] })
     expect(c.recs.map((r: any) => r.id)).toEqual(['p2'])
-    expect(c.v).toBe(6)
+    expect(c.v).toBe(7)
   })
 
   it('shares the Gemini key with the other phone', () => {

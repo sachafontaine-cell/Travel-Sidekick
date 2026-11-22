@@ -2,11 +2,12 @@
 import { useEffect, useState } from 'preact/hooks'
 import { Icon, Sheet, Spinner } from '../ui'
 import { nowIn, places, save, tripPlaces, trips } from '../lib/data'
-import { close, open } from '../lib/nav'
+import { close, open, replaceTop } from '../lib/nav'
 import { createStore } from '../lib/store'
 import { setDay } from '../lib/actions'
 import { discover, scorePlace } from '../lib/ai'
 import { deepSearch } from '../lib/deep'
+import { locateAll } from '../lib/locate'
 import { here, locate } from '../lib/here'
 import { between, byRank } from '../lib/rank'
 import { dateOf, dayPlaces, hoursOn, planDay, tripDays } from '../lib/planner'
@@ -134,6 +135,7 @@ export function DiscoverSheet({ trip }: { trip: Trip }) {
     try {
       await deepSearch(trip, tripPlaces(trip.id), (p) => { if (p.badge !== 'trap') add(p, last, found) }, (done, running, total) => setState({ busy: running.length ? `${done.length + 1} of ${total}: ${running.join(', ')} (${found.length} new)` : `${done.length} of ${total} (${found.length} new)` }))
       setState({ done: found.length ? `Added ${found.length}, unchecked and tagged New.` : 'Nothing new: your list already has it all.' })
+      void locateAll(trip).catch(() => {})
     } catch (e) { setState({ err: e instanceof Error ? e.message : 'Search failed.' }) }
   }
   const run = async (label: string, focus: string) => {
@@ -156,7 +158,11 @@ export function DiscoverSheet({ trip }: { trip: Trip }) {
   return (
     <Sheet title="Find more">
       <p class="muted small">Gemini searches Google for your dates and where you are.</p>
-      <button class="btn btn-primary press" disabled={!!state.busy} onClick={deep}><Icon.search />Search everything (1–2 min)</button>
+      <div class="row">
+        <button class="btn btn-secondary grow press" disabled={!!state.busy} onClick={() => replaceTop({ kind: 'sheet', name: 'review' })}><Icon.check />Check my list</button>
+        <button class="btn btn-primary grow press" disabled={!!state.busy} onClick={deep}><Icon.search />Search everything</button>
+      </div>
+      <p class="muted small" style={{ marginTop: '-6px' }}>Check: what's missing and what doesn't fit your vibe (1 min). Search everything: every kind of place, one search each (1–2 min).</p>
       <div class="chips">{FOCUS.map(([l, f]) => <button class="pill press" disabled={!!state.busy} onClick={() => run(l, f)}>{l}</button>)}</div>
       <div class="row">
         <input class="field grow" placeholder="Something specific, e.g. turtle release" value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter' && text.trim()) void run(text.trim(), `specifically: ${text.trim()}`) }} />

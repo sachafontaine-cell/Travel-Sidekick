@@ -114,6 +114,45 @@ async function streamPlaces(prompt: string, trip: Trip, onRaw: (raw: RawPlace) =
   return count
 }
 
+export type Review =
+  | { type: 'summary'; text: string }
+  | { type: 'missing'; place: Place }
+  | { type: 'drop' | 'check'; name: string; reason: string }
+
+/**
+ * "Check my list": Gemini searches Google and reviews the whole list for this trip: how complete
+ * it is and how well it fits the vibe, what's missing, what doesn't fit, what to double-check.
+ */
+export async function reviewList(trip: Trip, list: Place[], onItem: (r: Review) => void): Promise<void> {
+  const lines = list.map((p) => `- ${p.name} (${p.kind}${p.status === 'picked' ? ', checked' : ''}${p.must ? ', must-see' : ''}, worth ${p.worth})`).join('\n')
+  const prompt = `You are a family travel expert who knows ${trip.dest.name} like a local. Review this family's list for their trip below. Be candid.
+${tripBrief(trip)}
+Their list:
+${lines}
+Reply in JSON Lines only (one JSON object per line, no prose, no code fences):
+{"type":"summary","text":"2-3 sentences: how complete the list is and how well it fits their vibe, group and budget"}
+then for each important place or experience that is MISSING (up to 10, best first; include anything special on their dates and near where they stay), one line: {"type":"missing", ...the place, with these fields...}
+${FIELDS.replace('Each place is one JSON object on its own line (JSON Lines, no array, no prose, no code fences):\n', '')}
+then for each listed place that does NOT fit their vibe, group or budget (up to 8): {"type":"drop","name":"exact name from their list","reason":"max 90 chars"}
+then for each listed place to double-check (permanently closed, closed or seasonal outside their dates, duplicate, wrongly described; up to 6): {"type":"check","name":"exact name from their list","reason":"max 90 chars"}`
+  let any = false
+  let rank: string | undefined
+  const take = (line: string) => {
+    const o = jsonIn<{ type?: string; text?: string; name?: string; reason?: string } & RawPlace>(line, 'object')
+    if (!o?.type) return
+    if (o.type === 'summary' && o.text) { any = true; onItem({ type: 'summary', text: String(o.text).slice(0, 500) }) }
+    else if (o.type === 'missing') { rank = between(rank, undefined); const p = toPlace(o, trip, rank); if (p) { any = true; onItem({ type: 'missing', place: p }) } }
+    else if ((o.type === 'drop' || o.type === 'check') && o.name) { any = true; onItem({ type: o.type, name: String(o.name), reason: String(o.reason ?? '').slice(0, 140) }) }
+  }
+  const run = (grounded: boolean) => useModel((key, model) => {
+    let seen = 0
+    const body = { contents: [{ role: 'user', parts: [{ text: grounded ? `${prompt}\n${SEARCH}` : prompt }] }], ...(grounded ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: 0.3, maxOutputTokens: 12000 } }
+    return stream(key, model, body, (all) => { const ls = all.split('\n'); for (; seen < ls.length - 1; seen++) take(ls[seen]) }, { stallMs: grounded ? 60000 : 25000 }).then((all) => take(all.split('\n').at(-1) ?? ''))
+  })
+  try { await run(true) } catch (e) { if (any) throw e; await run(false) }
+  if (!any) throw new AiError('Gemini did not send a review. Try again.', 0, true)
+}
+
 /** One focused search (Google-grounded): up to `n` places for `focus`, not repeating `names`. */
 export async function searchPlaces(trip: Trip, focus: string, n: number, names: string[], onPlace: (p: Place) => void, near?: { lat: number; lng: number }): Promise<number> {
   const prompt = `You are a family travel expert who knows this place like a local. Find up to ${n} places or experiences for this trip: ${focus}.${near ? ` They are at ${near.lat.toFixed(4)}, ${near.lng.toFixed(4)} right now.` : ''}\n${tripBrief(trip)}\n${FIELDS}${names.length ? `\nAlready in their list (don't repeat): ${names.slice(0, 150).join('; ')}` : ''}`

@@ -45,6 +45,11 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,png,svg,ttf}'],
         navigateFallback: BASE + 'index.html',
         runtimeCaching: [{
+          // Map streets: keep the ones you've looked at, so the map works with a bad signal.
+          urlPattern: ({ url }) => url.hostname === 'tile.openstreetmap.org',
+          handler: 'CacheFirst',
+          options: { cacheName: 'map', expiration: { maxEntries: 600, maxAgeSeconds: 30 * 24 * 3600 }, cacheableResponse: { statuses: [0, 200] } },
+        }, {
           urlPattern: ({ url }) => url.hostname.endsWith('wikimedia.org'),
           handler: 'CacheFirst',
           options: { cacheName: 'photos', expiration: { maxEntries: 150, maxAgeSeconds: 90 * 24 * 3600 }, cacheableResponse: { statuses: [0, 200] } },

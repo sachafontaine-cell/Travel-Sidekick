@@ -36,6 +36,7 @@ export const Icon = {
   photo: () => svg(<><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.8" /><path d="M21 16l-5-5-8 8" /></>),
   car: () => svg(<><path d="M5 16V11l2-5h10l2 5v5" /><path d="M3 16h18v3H3z" /><circle cx="7.5" cy="19" r="1.5" /><circle cx="16.5" cy="19" r="1.5" /><path d="M5 11h14" /></>),
   search: () => svg(<><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></>),
+  pin: () => svg(<><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.3" /></>),
   cloud: () => svg(<><path d="M7 17a4 4 0 1 1 1-7.9A5 5 0 0 1 17.5 10a3.5 3.5 0 0 1-.5 7z" /><path d="M9 20l-1 1.5M13 20l-1 1.5M17 20l-1 1.5" /></>),
 }
 

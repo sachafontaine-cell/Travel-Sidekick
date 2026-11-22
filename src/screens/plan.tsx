@@ -32,14 +32,23 @@ export function Plan({ trip, day }: { trip: Trip; day: number }) {
       <h1 class="h1">Plan</h1>
       <div class="strip" role="tablist" aria-label="Days">
         <button role="tab" aria-selected={day === 0} class={`pill press${day === 0 ? ' on' : ''}`} onClick={() => go(tripPath(trip.id, 'plan'), true)}>All</button>
+        <button role="tab" aria-selected={day === -1} class={`pill press${day === -1 ? ' on' : ''}`} onClick={() => go(tripPath(trip.id, 'plan/map'), true)}><Icon.pin />Map</button>
         {Array.from({ length: n }, (_, i) => i + 1).map((d) => {
           const date = dateOf(trip, d)
           return <button role="tab" aria-selected={day === d} class={`pill press${day === d ? ' on' : ''}`} onClick={() => go(tripPath(trip.id, `plan/${d}`), true)}>{d === now.day ? 'Today' : `D${d}`} <span style={{ fontWeight: 500, opacity: 0.8 }}>{WEEKDAY[weekday(date)]}</span></button>
         })}
       </div>
-      {day === 0 ? <All trip={trip} /> : <Day trip={trip} day={Math.min(day, n)} />}
+      {day === -1 ? <MapLazy trip={trip} /> : day === 0 ? <All trip={trip} /> : <Day trip={trip} day={Math.min(day, n)} />}
     </main>
   )
+}
+
+/** The map and its library load only the first time Map is opened (keeps Plan fast). */
+let MapView: ((p: { trip: Trip }) => preact.JSX.Element) | null = null
+function MapLazy({ trip }: { trip: Trip }) {
+  const [, ready] = useState(!!MapView)
+  useEffect(() => { if (!MapView) void import('./map').then((m) => { MapView = m.MapView; ready(true) }) }, [])
+  return MapView ? <MapView trip={trip} /> : <div class="mapbox loading"><Spinner /></div>
 }
 
 function useRebalance(trip: Trip) {

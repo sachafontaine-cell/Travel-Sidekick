@@ -28,6 +28,8 @@ async function page(opts = {}) {
   p.on('console', (m) => { if (m.type() === 'error') p.errors.push(m.text()) })
   // Wikipedia is faked: by default it knows nothing (tests that need photos set their own).
   await p.route(/wikipedia\.org|wikidata\.org|wikimedia\.org/, (r) => r.fulfill({ json: { query: { geosearch: [] } } }))
+  // Map streets are faked too (a blank tile).
+  await p.route('https://tile.openstreetmap.org/**', (r) => r.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64') }))
   return p
 }
 const text = (p) => p.evaluate(() => document.body.innerText)
@@ -173,6 +175,43 @@ await test('sample trip: set your own start time on the Card; Auto gives it back
   await p.getByRole('button', { name: 'Auto', exact: true }).click()
   await p.getByText('Set by the planner').waitFor()
   expect(p.errors.length === 0, 'no console errors: ' + p.errors.join(' | '))
+  await p.context().close()
+})
+
+await test('sample trip: Map: filter first, then pins; a pin opens a summary and the card', async () => {
+  const p = await page()
+  await p.goto(BASE + '?demo#/t/demo-paris/plan')
+  await p.getByRole('tab', { name: /Map/ }).click()
+  const pins = p.locator('.leaflet-marker-icon .pin:not(.home)')
+  // Filters first: the map stays hidden until "Show … on the map".
+  await pins.first().waitFor({ state: 'attached' })
+  expect(!(await p.locator('.mapbox').isVisible()), 'map hidden while filtering')
+  await p.waitForTimeout(200)
+  const all = await pins.count()
+  await p.getByRole('button', { name: /^Food/ }).click()
+  await p.getByRole('button', { name: /Must-sees/ }).click()
+  await p.waitForTimeout(200)
+  const musts = await pins.count()
+  expect(await p.getByRole('button', { name: `Show ${musts} on the map` }).count() === 1, 'the button counts what the map shows')
+  expect(musts > 0 && musts < all, `filters narrow the pins (${all} → ${musts})`)
+  expect((await p.locator('.leaflet-marker-icon .pin:not(.home)').allInnerTexts()).every((x) => x === '★'), 'only must-sees')
+  await p.getByRole('button', { name: `Show ${musts} on the map` }).click()
+  await p.locator('.mapbox').waitFor()
+  await p.locator('.mapbox').scrollIntoViewIfNeeded()
+  await p.waitForTimeout(400)
+  await p.locator('.leaflet-marker-icon[title="Eiffel Tower"]').click({ force: true })
+  await p.locator('.mapcard').waitFor()
+  await p.locator('.mapcard').getByRole('button', { name: 'Details' }).click()
+  await p.getByRole('dialog').waitFor()
+  await p.keyboard.press('Escape')
+  await p.locator('.banner', { hasText: 'Filters' }).click()
+  await p.getByRole('button', { name: 'Reset' }).click()
+  await p.waitForTimeout(200)
+  expect(await pins.count() === all, 'Reset shows everything again')
+  expect(p.errors.length === 0, 'no console errors: ' + p.errors.join(' | '))
+  await p.getByRole('button', { name: `Show ${all} on the map` }).click()
+  await p.waitForTimeout(300)
+  await p.screenshot({ path: `${SHOTS}/map.png` })
   await p.context().close()
 })
 

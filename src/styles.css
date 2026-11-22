@@ -280,3 +280,15 @@ textarea.field { height: auto; padding: 10px 12px; resize: vertical; line-height
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .leaflet-tile { filter: brightness(.75) contrast(1.1) saturate(.8); } }
 :root[data-theme="dark"] .leaflet-tile { filter: brightness(.75) contrast(1.1) saturate(.8); }
 .shell:has(.mapwrap) .fab { display: none; }
+.goodskip { display: flex; flex-direction: column; gap: 4px; }
+.goodskip p { margin: 0; }
+.ok-text { color: var(--success); }
+.warn-text { color: var(--danger); }
+
+/* Decide */
+.decide { display: flex; flex-direction: column; gap: 12px; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.facts > div { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.decide-foot { position: sticky; bottom: -16px; margin: 0 -16px -16px; padding: 10px 16px 16px; background: var(--bg); border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.decide-btns { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 8px; width: 100%; }
+.decide-cta { display: flex; align-items: center; gap: 10px; border-color: var(--gold); }

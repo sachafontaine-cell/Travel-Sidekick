@@ -8,6 +8,7 @@ import { Rebalance } from './rebalance'
 import { AppSheet } from './settings'
 import { AddSheet, AddToDaySheet, DaySheet, DiscoverSheet, FilterSheet, RulesSheet } from './sheets'
 import { SETUP_SHEETS } from './setup'
+import { Decide } from './decide'
 
 export function Overlays({ trip }: { trip?: Trip }) {
   const list = overlays.use()
@@ -28,6 +29,7 @@ export function Overlays({ trip }: { trip?: Trip }) {
         if (o.name === 'day' && o.arg) return <DaySheet trip={t} id={o.arg} />
         if (o.name === 'rules') return <RulesSheet trip={t} />
         if (o.name === 'discover') return <DiscoverSheet trip={t} />
+        if (o.name === 'decide') return <Decide trip={t} />
         return null
       })}
     </>

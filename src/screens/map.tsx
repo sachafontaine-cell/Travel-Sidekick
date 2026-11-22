@@ -9,6 +9,7 @@ import { places, tripPlaces } from '../lib/data'
 import { open } from '../lib/nav'
 import { createStore } from '../lib/store'
 import { groupOf, type Group } from '../lib/groups'
+import { GROUP_COLOR, GROUP_LIST } from '../lib/groupStyle'
 import { tripDays } from '../lib/planner'
 import { price } from '../lib/money'
 import { legText } from '../lib/geo'
@@ -16,11 +17,7 @@ import { travelFrom } from '../lib/routes'
 import { here, locate } from '../lib/here'
 import type { Place, Trip } from '../lib/model'
 
-export const GROUP_LIST: [Group, string, string][] = [
-  ['sight', 'Sights', '#C2410C'], ['museum', 'Museums', '#7C3AED'], ['outdoors', 'Outdoors', '#15803D'], ['tour', 'Tours', '#0E7490'],
-  ['kids', 'Kids', '#DB2777'], ['show', 'Shows', '#B45309'], ['food', 'Food', '#DC2626'], ['shop', 'Shopping', '#2563EB'], ['other', 'Other', '#6B7280'],
-]
-const COLOR = Object.fromEntries(GROUP_LIST.map(([g, , c]) => [g, c])) as Record<Group, string>
+const COLOR = GROUP_COLOR
 
 interface MapFilters { which: 'all' | 'picked' | 'maybe'; off: Group[]; day: number | 'any' | 'none'; must: boolean; free: boolean; kids: boolean }
 const DEFAULT: MapFilters = { which: 'all', off: [], day: 'any', must: false, free: false, kids: false }

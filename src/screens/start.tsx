@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { Icon, Spinner } from '../ui'
 import { save, settings, trips, tripPlaces } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
-import { buildList, scorePlace, listKey } from '../lib/ai'
+import { scorePlace, listKey } from '../lib/ai'
+import { deepSearch } from '../lib/deep'
 import { autoPlan } from '../lib/rebalance'
 import { connected, scanEmail } from '../lib/sync'
-import { between } from '../lib/rank'
+import { between, spread } from '../lib/rank'
 import type { Place, Trip } from '../lib/model'
 
 type Step = { text: string; done: boolean }
@@ -27,7 +28,6 @@ export function Start({ trip }: { trip: Trip }) {
     setPhase('building'); setErr(''); setSteps([]); setFound([])
     // Bookings already on the trip (from Find my trips) stay, and aren't added twice.
     const all: Place[] = tripPlaces(trip.id)
-    const names = new Set<string>(all.map((p) => p.name.toLowerCase()))
     let base = trip.base
     try {
       let i = 0
@@ -37,17 +37,19 @@ export function Start({ trip }: { trip: Trip }) {
         step(i, 'Bookings from your email', true)
         i++
       }
-      step(i, 'Finding places for your family…')
-      const n = await buildList(trip, (p) => {
-        const k = p.name.toLowerCase()
-        if (names.has(k)) return
-        names.add(k); all.push(p)
+      step(i, 'Searching Google, one kind of place at a time…')
+      let rank: string | undefined
+      const n = await deepSearch(trip, all, (p) => {
+        rank = between(rank, undefined)
+        all.push({ ...p, rank })
         setFound([...all])
-        step(i, `Finding places for your family… ${all.length}`)
-      })
+      }, (done, running, total) => step(i, running.length ? `Searching ${done.length + 1} of ${total}: ${running.join(', ')}… (${all.length} places)` : `Searched ${done.length} of ${total}… (${all.length} places)`))
       step(i, `Found ${n} places for your family`, true)
       step(i + 1, 'Planning the days…')
-      const planned = autoPlan({ ...trip, base }, all)
+      // Best first in "My order": must-sees, then by worth.
+      const keys = spread(all.length)
+      const ordered = [...all].sort((a, b) => Number(b.must) - Number(a.must) || b.worth - a.worth).map((p, k) => (p.booked ? p : { ...p, rank: keys[k] }))
+      const planned = autoPlan({ ...trip, base }, ordered)
       setFound(planned)
       step(i + 1, 'Days planned', true)
       if (base !== trip.base) save('trip', [{ ...trips.get()[trip.id], base }])
@@ -94,7 +96,7 @@ export function Start({ trip }: { trip: Trip }) {
         </div>
       ) : (
         <>
-          <p class="muted">About 20 seconds, once per trip.</p>
+          <p class="muted">About 1–2 minutes, once per trip: it searches Google for each kind of place.</p>
           <div class="card card-pad stack">
             {steps.map((st) => <div class="row">{st.done ? <span style={{ color: 'var(--success)' }}><Icon.check /></span> : <Spinner />}<span class={st.done ? '' : 'hint'}>{st.text}</span></div>)}
             {phase === 'error' && <><p class="answer err">{err}</p><button class="btn btn-primary press" onClick={run}>Try again</button></>}

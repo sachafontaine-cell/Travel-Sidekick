@@ -6,7 +6,9 @@ import { BadgeChip, Icon, Spinner, StateChip } from '../ui'
 import { refreshList, refreshing, stale } from '../lib/refresh'
 import { travelFrom } from '../lib/routes'
 import { here, locate } from '../lib/here'
-import { days, nowIn, places, plansFor, save, tripPlaces, trips } from '../lib/data'
+import { capacity, capacityText } from '../lib/capacity'
+import { queueFor } from './decide'
+import { days, nowIn, places, plansFor, save, settings, tripPlaces, trips } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
 import { moveInDay, moveInList, pushDown, setDay, setStatus } from '../lib/actions'
 import { startDrag, swipeable } from '../lib/gestures'
@@ -87,6 +89,8 @@ function All({ trip }: { trip: Trip }) {
   const custom = f.sort !== 'mine' || f.hideTraps === false || f.under || f.kids || f.near
   const checked = all.filter((p) => p.must && p.hours?.source === 'google' && p.hours.checkedAt).map((p) => p.hours!.checkedAt!).sort().at(-1)
   const ticked = list.filter((p) => p.status === 'picked').length
+  const toDecide = queueFor(trip, settings.get().me).length
+  const cap = capacity(trip, all)
 
   return (
     <>
@@ -113,7 +117,14 @@ function All({ trip }: { trip: Trip }) {
         <button class="pill press" onClick={() => open({ kind: 'sheet', name: 'add', arg: trip.id })}><Icon.plus />Add</button>
       </div>
 
+      {toDecide > 0 && (
+        <button class="card card-pad press decide-cta" onClick={() => open({ kind: 'sheet', name: 'decide' })}>
+          <span class="grow stack" style={{ gap: '2px', textAlign: 'left' }}><b>Decide, one by one</b><span class="muted small">{toDecide} to go through: what each is like for your group, Great for / Skip if</span></span>
+          <Icon.chev />
+        </button>
+      )}
       <div class="section-h"><span class="label">Activities · {ticked} checked</span>{list.length > 0 && <span class="muted small">Check what you want</span>}</div>
+      <p class={`small ${cap.left < -60 ? 'warn-text' : 'muted'}`} style={{ marginTop: '-8px' }}>{capacityText(cap)}</p>
       {f.group === false ? <Section trip={trip} list={list} status="picked" draggable={f.sort === 'mine'} />
         : GROUPS.map(([name, key]) => {
           const g = list.filter((p) => groupOf(p) === key)

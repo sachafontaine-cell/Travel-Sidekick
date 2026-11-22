@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { BadgeFull, Dialog, Icon, Stepper } from '../ui'
 import { nowIn, places, plansFor, save, settings } from '../lib/data'
-import { describePlace, groupKey } from '../lib/ai'
+import { fillAbout } from '../lib/about'
 import { hasKids, weights } from '../lib/score'
 import { close, open, replaceTop } from '../lib/nav'
 import { setDone, setMinutes, setMust, setStatus, setTime } from '../lib/actions'
@@ -58,8 +58,26 @@ function FromHere({ trip, p }: { trip: Trip; p: Place }) {
   )
 }
 
+/** ✓ Great for … / ✕ Skip if … (for deciding). */
+export function GoodSkip({ p }: { p: Place }) {
+  return (
+    <div class="goodskip">
+      {p.good && <p><b class="ok-text">✓ Great for</b> {p.good}</p>}
+      {p.skipIf && <p><b class="warn-text">✕ Skip if</b> {p.skipIf}</p>}
+    </div>
+  )
+}
+
+const VOTE = { picked: 'wants it', maybe: 'says maybe', out: 'would skip it' }
+/** What the others said in Decide ("Marie wants it"). */
+export function Votes({ p }: { p: Place }) {
+  const me = settings.get().me
+  const others = Object.entries(p.votes ?? {}).filter(([who]) => who !== me)
+  if (!others.length) return null
+  return <p class="small">{others.map(([who, v]) => `${who} ${VOTE[v]}`).join(' · ')}</p>
+}
+
 const tried = new Set<string>()
-const described = new Set<string>()
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const hhmm = (m: number) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`
 const REC = { pay: 'Pay for it', cheaper: 'Do the cheaper version', skip: 'Skip it' }
@@ -71,12 +89,8 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
   useEffect(() => { if (p && !p.photos && !tried.has(id)) { tried.add(id); void photoFor(p, trip) } }, [id])
   // "New" (from a refresh) goes away once you've looked.
   useEffect(() => { if (p?.fresh) { const { fresh: _, ...rest } = p; save('place', [rest]) } }, [id])
-  // Places saved before descriptions existed get one the first time their card opens.
-  useEffect(() => {
-    if (!p || (p.desc && p.descFor === groupKey(trip)) || p.scoring || p.booked || described.has(id) || !settings.get().geminiKey) return
-    described.add(id)
-    describePlace(trip, p).then((d) => { const cur = places.get()[id]; if (d && cur) save('place', [{ ...cur, desc: d, descFor: groupKey(trip) }]) }).catch(() => { /* offline: next time */ })
-  }, [id])
+  // A description for your group (and Great for / Skip if) the first time the card opens.
+  useEffect(() => { if (p) void fillAbout(trip, [p]) }, [id])
   if (!p) return null
   const now = nowIn(trip)
   const day = p.day ?? null
@@ -108,6 +122,8 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
       )}
       {!ticket && p.recText && <p><b>{p.rec === 'pay' && p.price === 0 ? 'Go for it' : REC[p.rec]}.</b> {cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?)[:.,;]?\s*/i, ''))}</p>}
       {p.desc ? <p class="desc">{p.desc}</p> : !p.scoring && !p.booked && settings.get().geminiKey ? <p class="muted small">Getting a description…</p> : null}
+      {(p.good || p.skipIf) && <GoodSkip p={p} />}
+      <Votes p={p} />
 
       {!ticket && <FromHere trip={trip} p={p} />}
 

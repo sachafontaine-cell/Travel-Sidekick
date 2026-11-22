@@ -34,7 +34,7 @@ async function page(opts = {}) {
 }
 const text = (p) => p.evaluate(() => document.body.innerText)
 // The app writes to storage when idle (within 0.5 s): wait for that before reading it.
-const storedPlaces = async (p) => { await p.waitForTimeout(700); return p.evaluate(() => Object.values(JSON.parse(localStorage.getItem('ts:places') || '{}'))) }
+const storedPlaces = async (p) => { await p.waitForTimeout(700); return p.evaluate(() => Object.values(JSON.parse(localStorage.getItem(location.search.includes('demo') ? 'ts-demo:places' : 'ts:places') || '{}'))) }
 
 // ---------- Sample trip ----------
 
@@ -178,6 +178,35 @@ await test('sample trip: set your own start time on the Card; Auto gives it back
   await p.context().close()
 })
 
+await test('sample trip: Decide one by one: Want, Undo, Skip; room left', async () => {
+  const p = await page()
+  await p.goto(BASE + '?demo#/t/demo-paris/plan')
+  await p.getByText(/Room for about|days are about full|more than your days hold/).first().waitFor()
+  await p.getByRole('button', { name: /Decide, one by one/ }).click()
+  const d = p.getByRole('dialog')
+  await d.getByText(/^1 of \d+/).waitFor()
+  const first = (await d.locator('h2').innerText()).replace('★ ', '')
+  const before = await storedPlaces(p)
+  const top = Math.max(...before.filter((x) => x.status === 'maybe' && !x.must).map((x) => x.worth))
+  expect(before.find((x) => x.name === first).worth === top, `best first (${first})`)
+  await d.getByRole('button', { name: 'Want' }).click()
+  await d.getByText(/^2 of \d+/).waitFor()
+  await d.getByRole('button', { name: 'Undo' }).click()
+  await d.getByText(/^1 of \d+/).waitFor()
+  await d.getByRole('button', { name: 'Skip' }).click()
+  await d.getByText(/^2 of \d+/).waitFor()
+  await p.screenshot({ path: `${SHOTS}/decide.png` })
+  await d.getByRole('button', { name: 'Close' }).first().click()
+  const saved = await storedPlaces(p)
+  expect(saved.find((x) => x.name === first).status === 'out', 'Skip skips it')
+  // The card shows Great for / Skip if too.
+  await p.locator('.prow .open', { hasText: 'Catacombs' }).click()
+  await p.getByText('✓ Great for').waitFor()
+  await p.getByText('✕ Skip if').waitFor()
+  expect(p.errors.length === 0, 'no console errors: ' + p.errors.join(' | '))
+  await p.context().close()
+})
+
 await test('sample trip: Map: filter first, then pins; a pin opens a summary and the card', async () => {
   const p = await page()
   await p.goto(BASE + '?demo#/t/demo-paris/plan')
@@ -276,7 +305,10 @@ const PLACES = [
   { name: 'Bouillon Chartier', kind: 'meal', lat: 48.8719, lng: 2.3436, badge: 'gem', must: false, worth: 8, value: 9, sub: { iconic: 7, vibe: 9, hassle: 7, kid: 8 }, rec: 'pay', recText: 'Cheap classic.', why: '1896 hall.', tip: 'Arrive early.', price: 20, minutes: 75, indoor: true, hours: Array(7).fill('11:30-23:59') },
   { name: 'Seine dinner cruise', kind: 'show', lat: 48.8622, lng: 2.3013, badge: 'trap', must: false, worth: 5, value: 3, sub: { iconic: 6, vibe: 5, hassle: 5, kid: 4 }, rec: 'skip', recText: 'Pricey.', why: 'Same view free.', tip: 'Walk instead.', price: 85, minutes: 150, indoor: false, hours: Array(7).fill('19:00-23:00') },
 ]
+const passes = []
 async function fakeServices(p) {
+  // Real places nearby (OpenStreetMap): one Gemini didn't name on its own.
+  await p.route('https://overpass-api.de/**', (r) => r.fulfill({ json: { elements: [{ lat: 48.8440, lon: 2.3596, tags: { tourism: 'zoo', name: 'Jardin des Plantes', wikidata: 'Q1' } }, { lat: 48.8584, lon: 2.2945, tags: { tourism: 'attraction', name: 'Eiffel Tower', wikidata: 'Q243' } }] } }))
   await p.route('https://geocoding-api.open-meteo.com/**', (r) => r.fulfill({ json: { results: [{ name: 'Paris', latitude: 48.8566, longitude: 2.3522, timezone: 'Europe/Paris', country_code: 'FR', country: 'France', admin1: 'Île-de-France' }] } }))
   await p.route('https://api.open-meteo.com/**', (r) => r.fulfill({ json: { hourly: { time: ['2026-06-12T10:00'], temperature_2m: [70], precipitation_probability: [10] } } }))
   await p.route('https://api.frankfurter.**/**', (r) => r.fulfill({ json: { rates: { USD: 1.1 } } }))
@@ -287,9 +319,13 @@ async function fakeServices(p) {
       // A refresh after the settings changed: the same places re-scored, plus one new fit.
       const post = r.request().postData() ?? ''
       const again = post.includes('changed their trip settings')
-      // "Find more" searches Google (grounded) for one focus.
-      if (post.includes('Find up to 8 NEW')) expect(post.includes('google_search') && post.includes('turtle release'), 'Find more searches Google for what was typed')
-      const list = post.includes('Find up to 8 NEW') ? [{ ...PLACES[3], name: 'Sea turtle hatchling release', kind: 'outdoors', lat: 48.85, lng: 2.35 }] : again ? [...PLACES.map((x) => x.name === 'Luxembourg Gardens' ? { ...x, sub: { ...x.sub, vibe: 2 } } : x), { ...PLACES[3], name: 'Jardin des Plantes', lat: 48.8440, lng: 2.3596 }] : PLACES
+      // Every search is grounded in Google; "Find more" searches for what was typed.
+      if (!again) expect(post.includes('google_search'), 'searches Google')
+      passes.push(post)
+      const typed = post.includes('specifically: turtle release')
+      // The "map" pass judges real nearby places: it keeps the Jardin des Plantes from OpenStreetMap.
+      const fromMap = post.includes('from OpenStreetMap and Wikipedia') && post.includes('Jardin des Plantes') ? [{ ...PLACES[3], name: 'Jardin des Plantes', lat: 48.8440, lng: 2.3596 }] : []
+      const list = typed ? [{ ...PLACES[3], name: 'Sea turtle hatchling release', kind: 'outdoors', lat: 48.85, lng: 2.35 }] : again ? [...PLACES.map((x) => x.name === 'Luxembourg Gardens' ? { ...x, sub: { ...x.sub, vibe: 2 } } : x), { ...PLACES[3], name: 'Parc Monceau', lat: 48.8797, lng: 2.3091 }] : [...PLACES, ...fromMap]
       const lines = list.map((x) => JSON.stringify(x)).join('\n')
       const chunks = [lines.slice(0, 400), lines.slice(400, 1500), lines.slice(1500)]
       const body = chunks.map((c) => `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: c }] } }] })}\n\n`).join('')
@@ -341,6 +377,11 @@ await test('new trip: setup, key, build the list (streamed), confirm must-sees, 
   expect(orsay.day && orsay.day !== 4, `Orsay planned, not on Monday (Day ${orsay.day})`)
   expect(saved.find((x) => x.name === 'Louvre').must === false, 'unticked must-see is an ordinary pick')
   expect(saved.find((x) => x.name === 'Seine dinner cruise').status === 'out', 'the trap starts skipped')
+  // Deep search: one focused Google search per kind of place, plus real places from the map.
+  const first = passes.splice(0)
+  expect(first.length >= 8 && first.some((x) => x.includes('on or around their dates')) && first.some((x) => x.includes('beaches, nature')), `focused searches (${first.length})`)
+  expect(saved.some((x) => x.name === 'Jardin des Plantes'), 'a real place from OpenStreetMap that Gemini judged worth it')
+  expect(saved.filter((x) => x.name === 'Eiffel Tower').length === 1, 'no duplicates across searches')
   // Change the vibe: leaving Setup re-scores the list and adds a better fit, keeping our choices.
   await p.evaluate(() => { location.hash = location.hash.replace(/\/plan.*$/, '/setup') })
   await p.getByRole('button', { name: /Vibe/ }).click()
@@ -353,7 +394,7 @@ await test('new trip: setup, key, build the list (streamed), confirm must-sees, 
   expect(lux.worth < lux0.worth && lux.status === lux0.status && lux.day === lux0.day, `re-scored, choices kept (${lux0.worth} → ${lux.worth})`)
   expect(after.find((x) => x.name === "Musée d'Orsay").day === orsay.day, 'days kept')
   expect(after.find((x) => x.name === 'Louvre').must === false, 'must-see choice kept')
-  const jp = after.find((x) => x.name === 'Jardin des Plantes')
+  const jp = after.find((x) => x.name === 'Parc Monceau')
   expect(jp && jp.status === 'maybe' && jp.fresh, 'new fit added, unchecked, tagged New')
   await p.getByText('New', { exact: true }).first().waitFor()
   // Find more: type what we're after; it comes back unchecked, tagged New.

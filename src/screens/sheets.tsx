@@ -6,6 +6,7 @@ import { close, open } from '../lib/nav'
 import { createStore } from '../lib/store'
 import { setDay } from '../lib/actions'
 import { discover, scorePlace } from '../lib/ai'
+import { deepSearch } from '../lib/deep'
 import { here, locate } from '../lib/here'
 import { between, byRank } from '../lib/rank'
 import { dateOf, dayPlaces, hoursOn, planDay, tripDays } from '../lib/planner'
@@ -120,6 +121,21 @@ export function DiscoverSheet({ trip }: { trip: Trip }) {
   const [state, setState] = useState<{ busy?: string; done?: string; err?: string }>({})
   const loc = here.use()
   useEffect(() => { void locate() }, [])
+  const add = (p: Place, last: { rank?: string }, found: string[]) => {
+    last.rank = between(last.rank, undefined)
+    save('place', [{ ...p, rank: last.rank, status: 'maybe', must: false, fresh: true }])
+    found.push(p.name)
+  }
+  /** Every kind of place, one Google search each, plus real places nearby from the map. */
+  const deep = async () => {
+    setState({ busy: 'everything' })
+    const last = { rank: tripPlaces(trip.id).sort(byRank).at(-1)?.rank }
+    const found: string[] = []
+    try {
+      await deepSearch(trip, tripPlaces(trip.id), (p) => { if (p.badge !== 'trap') add(p, last, found) }, (done, running, total) => setState({ busy: running.length ? `${done.length + 1} of ${total}: ${running.join(', ')} (${found.length} new)` : `${done.length} of ${total} (${found.length} new)` }))
+      setState({ done: found.length ? `Added ${found.length}, unchecked and tagged New.` : 'Nothing new: your list already has it all.' })
+    } catch (e) { setState({ err: e instanceof Error ? e.message : 'Search failed.' }) }
+  }
   const run = async (label: string, focus: string) => {
     setState({ busy: label })
     const all = tripPlaces(trip.id)
@@ -140,12 +156,13 @@ export function DiscoverSheet({ trip }: { trip: Trip }) {
   return (
     <Sheet title="Find more">
       <p class="muted small">Gemini searches Google for your dates and where you are.</p>
+      <button class="btn btn-primary press" disabled={!!state.busy} onClick={deep}><Icon.search />Search everything (1–2 min)</button>
       <div class="chips">{FOCUS.map(([l, f]) => <button class="pill press" disabled={!!state.busy} onClick={() => run(l, f)}>{l}</button>)}</div>
       <div class="row">
         <input class="field grow" placeholder="Something specific, e.g. turtle release" value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter' && text.trim()) void run(text.trim(), `specifically: ${text.trim()}`) }} />
         <button class="btn btn-primary btn-sm press" disabled={!text.trim() || !!state.busy} onClick={() => run(text.trim(), `specifically: ${text.trim()}`)}>Search</button>
       </div>
-      {state.busy && <div class="row muted"><Spinner />Searching: {state.busy}… (up to a minute)</div>}
+      {state.busy && <div class="row muted"><Spinner />Searching {state.busy}…</div>}
       {state.done && <p class="answer">{state.done}</p>}
       {state.err && <p class="answer err">{state.err}</p>}
     </Sheet>

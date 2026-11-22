@@ -50,6 +50,11 @@ export interface Place {
   scoreV?: 2
   /** 2-3 sentences: what it is and what you'll do there. */
   desc?: string
+  /** Who in the group will love it, and the honest reason to skip it (for deciding). */
+  good?: string
+  skipIf?: string
+  /** Each person's call in Decide (by name, from ⚙ This phone): want, maybe or skip. */
+  votes?: Record<string, Status>
   /** The group's ages when desc was written (see groupKey); a different group gets a new one. */
   descFor?: string
   worth: number

@@ -41,6 +41,8 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
   const [why, setWhy] = useState(false)
   // Photos are looked up in the background; if this one hasn't been yet, do it now (never blocks).
   useEffect(() => { if (p && !p.photos && !tried.has(id)) { tried.add(id); void photoFor(p, trip) } }, [id])
+  // "New" (from a refresh) goes away once you've looked.
+  useEffect(() => { if (p?.fresh) { const { fresh: _, ...rest } = p; save('place', [rest]) } }, [id])
   // Places saved before descriptions existed get one the first time their card opens.
   useEffect(() => {
     if (!p || (p.desc && p.descFor === groupKey(trip)) || p.scoring || p.booked || described.has(id) || !settings.get().geminiKey) return

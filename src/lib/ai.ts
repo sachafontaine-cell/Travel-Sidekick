@@ -133,6 +133,28 @@ export async function describePlace(trip: Trip, p: Place): Promise<string> {
   return answerText(j).trim().slice(0, 420)
 }
 
+/** What the suggestions depend on: changing any of it re-scores the list. */
+export const listKey = (t: Trip) => JSON.stringify([t.vibes, t.budget, groupKey(t), t.pace, t.food.trim(), t.nos])
+
+/**
+ * The trip settings changed: re-score every place in the list for the new settings and suggest
+ * up to 8 new ones that fit better. Streams; `onPlace` gets each line (old names kept exactly).
+ */
+export async function rescoreList(trip: Trip, names: string[], onPlace: (raw: Place) => void): Promise<number> {
+  const prompt = `You are a family travel expert. This family changed their trip settings. Re-score every place in their list below for the trip as it is now (same exact name for each), then suggest up to 8 NEW places that fit these settings better and are not in the list.\n${tripBrief(trip)}\n${FIELDS}\nTheir list:\n${names.map((n) => `- ${n}`).join('\n')}`
+  let count = 0
+  await useModel((key, model) => {
+    let seen = 0
+    count = 0
+    const take = (line: string) => { const raw = jsonIn<RawPlace>(line, 'object'); const p = raw && toPlace(raw, trip, ''); if (p) { count++; onPlace(p) } }
+    return stream(key, model, { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 16000 } }, (all) => {
+      const lines = all.split('\n')
+      for (; seen < lines.length - 1; seen++) take(lines[seen])
+    }).then((all) => { take(all.split('\n').at(-1) ?? '') })
+  })
+  return count
+}
+
 /** Ask: streams the answer; a final "ACTION {…}" line proposes a change the app can apply. */
 export interface AskAction { type: 'move'; place: string; day: number | null; time?: string }
 export async function ask(context: string, question: string, onText: (visible: string) => void): Promise<{ text: string; action?: AskAction }> {

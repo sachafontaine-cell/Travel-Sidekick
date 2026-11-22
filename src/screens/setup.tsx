@@ -12,6 +12,7 @@ import { clock, dateRange, duration } from '../lib/time'
 import { findAddress, findCity } from '../lib/weather'
 import { tripDays } from '../lib/planner'
 import { uid } from '../lib/store'
+import { refreshList } from '../lib/refresh'
 
 const VIBE_NAMES = Object.fromEntries(VIBES.map((v) => [v.id, v.name]))
 const LEVEL = ['$', '$$', '$$$']
@@ -26,6 +27,8 @@ export function suggestedVibes(t: Trip): Partial<Record<Vibe, number>> {
 
 export function Setup({ trip }: { trip: Trip }) {
   const t = trip
+  // Leaving Setup after changing the vibe, budget, group, pace or food: re-score the list.
+  useEffect(() => () => { void refreshList(trip.id) }, [trip.id])
   const ready = !!t.dest.name && !!t.start && !!t.end && t.people.length > 0
   const row = (name: string, label: string, value: string, missing = false) => (
     <button class="kv press" onClick={() => open({ kind: 'sheet', name, arg: t.id })}>

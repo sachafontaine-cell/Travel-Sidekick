@@ -79,6 +79,8 @@ export interface Place {
   done?: boolean
   /** Being scored by Gemini right now (added by hand). */
   scoring?: boolean
+  /** Suggested by a refresh after the trip settings changed; shows "New" until its card is opened. */
+  fresh?: true
   /** The English Wikipedia article for this place, if Gemini knows one (checked before use). */
   wiki?: string | null
   /** Representative photos (Wikipedia), looked up once. `urls` empty = none found. */
@@ -118,6 +120,8 @@ export interface Trip {
   found?: 'email'
   /** The list was built (first run done). */
   built?: boolean
+  /** The settings the list was last scored for (see listKey); different = suggestions need a refresh. */
+  listFor?: string
   /** Before-you-go checklist ticks. */
   ready?: Record<string, boolean>
   rules?: { title: string; text: string }[]

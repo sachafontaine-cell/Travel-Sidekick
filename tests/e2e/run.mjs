@@ -241,7 +241,10 @@ async function fakeServices(p) {
     const url = r.request().url()
     if (url.includes('/models?')) return r.fulfill({ json: { models: [{ name: 'models/gemini-9.9-flash', supportedGenerationMethods: ['generateContent'] }] } })
     if (url.includes('streamGenerateContent')) {
-      const lines = PLACES.map((x) => JSON.stringify(x)).join('\n')
+      // A refresh after the settings changed: the same places re-scored, plus one new fit.
+      const again = (r.request().postData() ?? '').includes('changed their trip settings')
+      const list = again ? [...PLACES.map((x) => x.name === 'Luxembourg Gardens' ? { ...x, sub: { ...x.sub, vibe: 2 } } : x), { ...PLACES[3], name: 'Jardin des Plantes', lat: 48.8440, lng: 2.3596 }] : PLACES
+      const lines = list.map((x) => JSON.stringify(x)).join('\n')
       const chunks = [lines.slice(0, 400), lines.slice(400, 1500), lines.slice(1500)]
       const body = chunks.map((c) => `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: c }] } }] })}\n\n`).join('')
       return r.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body })
@@ -250,7 +253,7 @@ async function fakeServices(p) {
   })
 }
 
-await test('new trip: setup, key, build the list (streamed), confirm must-sees, days planned', async () => {
+await test('new trip: setup, key, build the list (streamed), confirm must-sees, days planned; vibe change re-scores', async () => {
   const p = await page()
   await fakeServices(p)
   await p.goto(BASE)
@@ -292,6 +295,21 @@ await test('new trip: setup, key, build the list (streamed), confirm must-sees, 
   expect(orsay.day && orsay.day !== 4, `Orsay planned, not on Monday (Day ${orsay.day})`)
   expect(saved.find((x) => x.name === 'Louvre').must === false, 'unticked must-see is an ordinary pick')
   expect(saved.find((x) => x.name === 'Seine dinner cruise').status === 'out', 'the trap starts skipped')
+  // Change the vibe: leaving Setup re-scores the list and adds a better fit, keeping our choices.
+  await p.evaluate(() => { location.hash = location.hash.replace(/\/plan.*$/, '/setup') })
+  await p.getByRole('button', { name: /Vibe/ }).click()
+  await p.getByRole('button', { name: 'More Family' }).click()
+  await p.keyboard.press('Escape')
+  await p.getByRole('button', { name: 'See the plan' }).click()
+  await p.getByText(/Suggestions updated · 1 new/).waitFor({ timeout: 10000 })
+  const after = await p.evaluate(() => Object.values(JSON.parse(localStorage.getItem('ts:places') || '{}')))
+  const lux0 = saved.find((x) => x.name === 'Luxembourg Gardens'), lux = after.find((x) => x.name === 'Luxembourg Gardens')
+  expect(lux.worth < lux0.worth && lux.status === lux0.status && lux.day === lux0.day, `re-scored, choices kept (${lux0.worth} → ${lux.worth})`)
+  expect(after.find((x) => x.name === "Musée d'Orsay").day === orsay.day, 'days kept')
+  expect(after.find((x) => x.name === 'Louvre').must === false, 'must-see choice kept')
+  const jp = after.find((x) => x.name === 'Jardin des Plantes')
+  expect(jp && jp.status === 'maybe' && jp.fresh, 'new fit added, unchecked, tagged New')
+  await p.getByText('New', { exact: true }).first().waitFor()
   expect(p.errors.filter((e) => !/Failed to load resource/.test(e)).length === 0, 'no errors: ' + p.errors.join(' | '))
   await p.screenshot({ path: `${SHOTS}/new-trip-plan.png` })
   await p.context().close()

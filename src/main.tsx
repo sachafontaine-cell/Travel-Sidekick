@@ -10,6 +10,7 @@ import { startUpdates, setHomeCheck } from './lib/update'
 import { cursor, startSync } from './lib/sync'
 import { startBackground } from './lib/background'
 import { rescore } from './lib/score'
+import { listKey } from './lib/ai'
 
 // The sample trip lives in its own space and always starts fresh.
 if (DEMO && !trips.get()['demo-paris']) {
@@ -19,7 +20,11 @@ if (DEMO && !trips.get()['demo-paris']) {
   settings.set({ ...settings.get(), me: 'Alex' })
 }
 // Scores from before "worth = the bars" are redone once (and sync to the other phone).
-for (const t of Object.values(trips.get())) { const re = rescore(t, tripPlaces(t.id)); if (re.length) save('place', re) }
+for (const t of Object.values(trips.get())) {
+  const re = rescore(t, tripPlaces(t.id)); if (re.length) save('place', re)
+  // Lists built before refreshes existed count as up to date with today's settings.
+  if (t.built && t.listFor == null) save('trip', [{ ...t, listFor: listKey(t) }])
+}
 if (DEMO && !location.hash.replace(/^#\/?/, '')) go(tripPath('demo-paris'), true)
 
 // The family link (…/?k=KEY&api=SCRIPT_URL) is read once, kept on this phone, then hidden.

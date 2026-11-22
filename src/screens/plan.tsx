@@ -2,7 +2,8 @@
 // and "Plan my days" fits it into the days. Each day chip shows that day's timeline.
 import { useMemo, useRef, useState } from 'preact/hooks'
 import { createStore } from '../lib/store'
-import { BadgeChip, Icon, StateChip } from '../ui'
+import { BadgeChip, Icon, Spinner, StateChip } from '../ui'
+import { refreshList, refreshing, stale } from '../lib/refresh'
 import { days, nowIn, places, plansFor, save, tripPlaces, trips } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
 import { moveInDay, moveInList, pushDown, setDay, setStatus } from '../lib/actions'
@@ -89,6 +90,8 @@ function All({ trip }: { trip: Trip }) {
         </div>
       )}
 
+      <RefreshBanner trip={trip} />
+
       <div class="row">
         <button class={`pill press${custom ? ' dark' : ''}`} onClick={() => open({ kind: 'sheet', name: 'filter' })}><Icon.filter />{custom ? 'Filtered' : 'Sort & filter'}</button>
         <span class="grow" />
@@ -106,6 +109,20 @@ function All({ trip }: { trip: Trip }) {
       {showOut && <Section trip={trip} list={out} status="out" draggable={false} />}
       <PlanBar trip={trip} />
     </>
+  )
+}
+
+/** After the vibe, budget, group, pace or food changed: the list is being (or needs to be) re-scored. */
+function RefreshBanner({ trip }: { trip: Trip }) {
+  const r = refreshing.use()[trip.id]
+  if (r === 'busy') return <div class="banner"><Spinner /><span class="grow small">Updating suggestions for your new settings… (about 30 s)</span></div>
+  if (!stale(trip)) return null
+  return (
+    <div class="banner">
+      <span class="dot red" />
+      <span class="grow small">{r ? `Couldn't update: ${r}` : 'Trip settings changed: suggestions are out of date.'}</span>
+      <button class="btn btn-primary btn-sm press" onClick={() => void refreshList(trip.id)}>Update</button>
+    </div>
   )
 }
 
@@ -177,7 +194,7 @@ function Row({ trip, p, draggable, onGrip }: { trip: Trip; p: Place; draggable: 
       <Tick p={p} />
       <button class="open press" onClick={() => open({ kind: 'card', place: p.id })}>
         <span class="name">{p.name}</span>
-        <span class="meta"><BadgeChip p={p} />{p.scoring ? <span>Scoring…</span> : <span>Worth {p.worth} · {price(trip, p.price, false)}</span>}{p.day ? <span class="chip plain">Day {p.day}</span> : p.status === 'picked' && unfitIds.get().includes(p.id) ? <span class="chip amber">Doesn't fit</span> : null}{p.done && <span class="chip plain">Done</span>}</span>
+        <span class="meta">{p.fresh && <span class="chip ok">New</span>}<BadgeChip p={p} />{p.scoring ? <span>Scoring…</span> : <span>Worth {p.worth} · {price(trip, p.price, false)}</span>}{p.day ? <span class="chip plain">Day {p.day}</span> : p.status === 'picked' && unfitIds.get().includes(p.id) ? <span class="chip amber">Doesn't fit</span> : null}{p.done && <span class="chip plain">Done</span>}</span>
       </button>
       {draggable && <span class="handle" role="button" aria-label={`Drag to reorder ${p.name}`} onPointerDown={(e) => onGrip(e as unknown as PointerEvent)}><Icon.grip /></span>}
     </div>

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { Icon, Spinner } from '../ui'
 import { save, settings, trips, tripPlaces } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
-import { buildList, scorePlace } from '../lib/ai'
+import { buildList, scorePlace, listKey } from '../lib/ai'
 import { autoPlan } from '../lib/rebalance'
 import { connected, scanEmail } from '../lib/sync'
 import { between } from '../lib/rank'
@@ -77,7 +77,7 @@ export function Start({ trip }: { trip: Trip }) {
     // Unticked must-sees stay in the list as ordinary picks.
     const final = autoPlan(trip, found.map((p) => ({ ...p, day: p.fixed != null ? p.day : null })))
     save('place', final)
-    save('trip', [{ ...trips.get()[trip.id], built: true }])
+    save('trip', [{ ...trips.get()[trip.id], built: true, listFor: listKey(trips.get()[trip.id]) }])
     go(tripPath(trip.id, 'plan'), true)
   }
 

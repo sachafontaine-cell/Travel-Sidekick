@@ -13,7 +13,7 @@ import { shortDate, WEEKDAY, weekday } from '../lib/time'
 import { symbol } from '../lib/money'
 import type { Place, Trip } from '../lib/model'
 
-export interface Filters { sort: 'mine' | 'worth' | 'value' | 'price' | 'distance' | 'must'; hideTraps: boolean; under?: number; kids: boolean; near: boolean }
+export interface Filters { sort: 'mine' | 'worth' | 'value' | 'price' | 'distance' | 'must'; hideTraps: boolean; under?: number; kids: boolean; near: boolean; group?: boolean }
 export const filters = createStore<Filters>({ sort: 'mine', hideTraps: true, kids: false, near: false }, 'filters')
 
 export function FilterSheet({ trip }: { trip: Trip }) {
@@ -31,6 +31,7 @@ export function FilterSheet({ trip }: { trip: Trip }) {
           {[20, 30, 50].map((n) => <button class={`pill press${f.under === n ? ' on' : ''}`} aria-pressed={f.under === n} onClick={() => set({ under: f.under === n ? undefined : n })}>Under {cur}{n}</button>)}
           <button class={`pill press${f.near ? ' on' : ''}`} aria-pressed={f.near} onClick={() => set({ near: !f.near })}>Near the hotel</button>
           <button class={`pill press${f.kids ? ' on' : ''}`} aria-pressed={f.kids} onClick={() => set({ kids: !f.kids })}>Kid-friendly</button>
+          <button class={`pill press${f.group !== false ? ' on' : ''}`} aria-pressed={f.group !== false} onClick={() => set({ group: f.group === false })}>Group by type</button>
         </div>
       </div>
     </Sheet>

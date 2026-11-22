@@ -94,13 +94,22 @@ function All({ trip }: { trip: Trip }) {
         <button class="pill press" onClick={() => open({ kind: 'sheet', name: 'add', arg: trip.id })}><Icon.plus />Add</button>
       </div>
 
-      <Section trip={trip} title={`Activities · ${ticked} checked`} list={list} status="picked" draggable={f.sort === 'mine'} />
+      <div class="section-h"><span class="label">Activities · {ticked} checked</span>{list.length > 0 && <span class="muted small">Check what you want</span>}</div>
+      {f.group === false ? <Section trip={trip} list={list} status="picked" draggable={f.sort === 'mine'} />
+        : GROUPS.map(([name, kinds]) => {
+          const g = list.filter((p) => kinds.includes(p.kind))
+          return g.length ? <Section trip={trip} title={name} hint={`${g.filter((p) => p.status === 'picked').length} of ${g.length}`} list={g} status="picked" draggable={f.sort === 'mine'} /> : null
+        })}
+      {list.length === 0 && <p class="muted small">Nothing here. Tap + Add.</p>}
       {out.length > 0 && <button class="fold press" aria-expanded={showOut} onClick={() => setShowOut(!showOut)}>Skipped ({out.length}){showOut ? <Icon.up /> : <Icon.down />}</button>}
       {showOut && <Section trip={trip} list={out} status="out" draggable={false} />}
       <PlanBar trip={trip} />
     </>
   )
 }
+
+/** Type groups, in this order. */
+const GROUPS: [string, Place['kind'][]][] = [['Sights', ['sight']], ['Museums', ['museum']], ['Parks & play', ['park']], ['Shows', ['show']], ['Food', ['meal', 'snack']], ['Shopping', ['shop']], ['Other', ['other']]]
 
 /** Places that didn't fit the last time "Plan my days" ran (so the bar doesn't nag about them). */
 const unfitIds = createStore<string[]>([])
@@ -132,13 +141,13 @@ function PlanBar({ trip }: { trip: Trip }) {
   )
 }
 
-function Section({ trip, title, list, status, draggable }: { trip: Trip; title?: string; list: Place[]; status: Status; draggable: boolean }) {
+function Section({ trip, title, hint, list, status, draggable }: { trip: Trip; title?: string; hint?: string; list: Place[]; status: Status; draggable: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
-  if (!list.length && status === 'out') return null
+  if (!list.length) return null
   return (
     <div class="section">
-      {title && <div class="section-h"><span class="label">{title}</span>{list.length > 0 && <span class="muted small">Check what you want</span>}</div>}
-      {list.length === 0 ? <p class="muted small">Nothing here. Tap + Add.</p> : (
+      {title && <div class="section-h"><span class="h3">{title}</span>{hint && <span class="muted small">{hint}</span>}</div>}
+      {(
         <div class="list" ref={ref}>
           {list.map((p, i) => <Row trip={trip} p={p} draggable={draggable} onGrip={(e) => ref.current && startDrag(e, ref.current, i, (from, to) => {
             const rest = list.filter((_, k) => k !== from)

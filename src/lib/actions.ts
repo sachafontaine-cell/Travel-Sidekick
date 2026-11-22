@@ -4,7 +4,8 @@ import type { DayMeta, Place, Status, Trip } from './model'
 import { days, places, save, trips, tripPlaces, newId } from './data'
 import { between, byRank } from './rank'
 import { dayPlaces } from './planner'
-import { PACE_DEFAULTS } from './people'
+import { defaultFamily, PACE_DEFAULTS } from './people'
+import { localNow } from './time'
 import type { Proposal } from './rebalance'
 
 const one = (id: string) => places.get()[id]
@@ -89,7 +90,7 @@ export function newTrip(): Trip {
   const d = PACE_DEFAULTS.balanced
   const t: Trip = {
     id: newId(), name: '', dest: { name: '', lat: 0, lng: 0, tz: 'UTC', country: '', currency: 'USD', lang: 'en' },
-    start: '', end: '', vibes: {}, budget: { all: 2 }, pace: 'balanced', people: [],
+    start: '', end: '', vibes: {}, budget: { all: 2 }, pace: 'balanced', people: defaultFamily(Object.values(trips.get()), localNow(Intl.DateTimeFormat().resolvedOptions().timeZone).date),
     dayStart: d.dayStart, dayEnd: d.dayEnd, downtime: { on: true, minutes: d.downtime }, food: '', nos: [], home: 'USD', at: Date.now(),
   }
   save('trip', [t])

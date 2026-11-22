@@ -33,3 +33,28 @@ export const PACE_DEFAULTS: Record<Pace, { dayStart: number; dayEnd: number; dow
   balanced: { dayStart: 540, dayEnd: 1260, downtime: 90 },
   packed: { dayStart: 480, dayEnd: 1320, downtime: 60 },
 }
+
+/** Age on a date from 'yyyy-mm-dd'. */
+export function ageOn(birth: string, on: string): number | undefined {
+  const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birth), d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(on)
+  if (!b || !d) return undefined
+  return +d[1] - +b[1] - (+d[2] * 100 + +d[3] < +b[2] * 100 + +b[3] ? 1 : 0)
+}
+
+/**
+ * The family, ready for a new trip: the people of the latest trip, or else Chef Luc's family on
+ * this phone (same web address; ages from birthdays on `on`, the trip start or today).
+ */
+export function defaultFamily(trips: Pick<Trip, 'people' | 'start' | 'at'>[], on: string): Person[] {
+  const last = [...trips].filter((t) => t.people.length).sort((a, b) => (b.start || '').localeCompare(a.start || '') || b.at - a.at)[0]
+  if (last) return last.people.map((p) => ({ ...p, id: Math.random().toString(36).slice(2, 10) }))
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('chef-luc:settings') : null
+    const fam = (raw ? JSON.parse(raw)?.family : null) as { name: string; adult: boolean; birth?: string }[] | null
+    if (!Array.isArray(fam)) return []
+    return fam.filter((m) => m && m.name).map((m) => ({
+      id: Math.random().toString(36).slice(2, 10), name: String(m.name),
+      age: (m.birth ? ageOn(m.birth, on) : undefined) ?? (m.adult ? 40 : 10),
+    }))
+  } catch { return [] }
+}

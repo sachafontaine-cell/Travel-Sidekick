@@ -6,7 +6,7 @@ import { trips } from '../lib/data'
 import { close, go, open, tripPath } from '../lib/nav'
 import { deleteTrip, saveTrip } from '../lib/actions'
 import { VIBES, type Level, type Pace, type Person, type Trip, type Vibe } from '../lib/model'
-import { groupLimit, milesFor, PACE_DEFAULTS, suggestedMiles } from '../lib/people'
+import { defaultFamily, groupLimit, milesFor, PACE_DEFAULTS, suggestedMiles } from '../lib/people'
 import { describe, minus, plus } from '../lib/vibes'
 import { clock, dateRange, duration } from '../lib/time'
 import { findAddress, findCity } from '../lib/weather'
@@ -102,8 +102,10 @@ export function WhoSheet({ id }: { id: string }) {
   if (!t) return null
   const update = (p: Person, patch: Partial<Person>) => set(t, { people: t.people.map((x) => (x.id === p.id ? { ...x, ...patch } : x)) })
   const limit = groupLimit(t)
+  const family = t.people.length ? [] : defaultFamily(Object.values(trips.get()).filter((x) => x.id !== t.id), t.start || new Date().toISOString().slice(0, 10))
   return (
     <Sheet title="Who's coming">
+      {family.length > 0 && <button class="btn btn-primary press" onClick={() => set(t, { people: family })}>Add the family: {family.map((p) => p.name).join(', ')}</button>}
       {t.people.map((p) => {
         const [lo, hi] = suggestedMiles(p.age)
         return (

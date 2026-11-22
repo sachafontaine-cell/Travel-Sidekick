@@ -59,7 +59,7 @@ Without it the app works on one phone, with no emails.
 Everything is on the phone and every screen draws from memory; nothing a tap does waits for the network. The day planner is plain code (milliseconds), Gemini work is done ahead of time (scores when the list is built), Ask streams its answer, walking times are estimated instantly. Sync, weather, exchange rate and hours checks run in the background.
 
 ## Develop
-`npm install`, `npm run dev`, `npm test` (planner, rebalance, vibes, the Google script against fake Google services), `npm run e2e` (builds, then phone-size browser tests: sample trip, a whole new trip with Gemini faked, offline, dark mode, speed budgets). Icons: `node scripts/icons.mjs pin` (designs in `scripts/icon-designs.mjs`).
+`npm install`, `npm run dev`, `npm test` (planner, rebalance, vibes, the Google script against fake Google services), `npm run e2e` (builds, then phone-size browser tests: sample trip, a whole new trip with Gemini faked, offline, dark mode, speed budgets). Icons: `node scripts/icons.mjs suitcase` (designs in `scripts/icon-designs.mjs`).
 
 Script changes: edit `script/Code.gs`, raise `VERSION` there **and** in `script/version.json` (same number), push to `main`. The family script picks it up that night.
 

@@ -3,7 +3,7 @@
 import { createRequire } from 'node:module'
 import { icon } from './icon-designs.mjs'
 const { chromium } = createRequire(import.meta.url)('playwright')
-const design = process.argv[2] ?? 'pin'
+const design = process.argv[2] ?? 'suitcase'
 const b = await chromium.launch(), p = await b.newPage()
 for (const [file, size, scale] of [['icon-512.png', 512, 0.86], ['icon-192.png', 192, 0.86], ['apple-touch-icon.png', 180, 0.82], ['favicon.png', 64, 0.95], ['icon-maskable.png', 512, 0.66]]) {
   await p.setViewportSize({ width: size, height: size })

@@ -1,0 +1,35 @@
+import { render } from 'preact'
+import './styles.css'
+import { App } from './app'
+import { DEMO } from './lib/store'
+import { places, settings, trips } from './lib/data'
+import { demoTrip } from './lib/demo'
+import { go, overlays, tripPath } from './lib/nav'
+import { startUpdates, setHomeCheck } from './lib/update'
+import { startSync } from './lib/sync'
+import { startBackground } from './lib/background'
+
+// The sample trip lives in its own space and always starts fresh.
+if (DEMO && !trips.get()['demo-paris']) {
+  const { trip, places: ps } = demoTrip()
+  trips.set({ [trip.id]: trip })
+  places.set(Object.fromEntries(ps.map((p) => [p.id, p])))
+  settings.set({ ...settings.get(), me: 'Alex' })
+}
+if (DEMO && !location.hash.replace(/^#\/?/, '')) go(tripPath('demo-paris'), true)
+
+// The family link (…/?k=KEY&api=SCRIPT_URL) is read once, kept on this phone, then hidden.
+const q = new URLSearchParams(location.search)
+if (q.get('k')) {
+  settings.set({ ...settings.get(), familyKey: q.get('k')!, api: q.get('api') ?? settings.get().api })
+  q.delete('k'); q.delete('api')
+  history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash)
+}
+
+render(<App />, document.getElementById('app')!)
+
+// A new version is applied when you leave the app, never in the middle of something.
+setHomeCheck(() => overlays.get().length === 0)
+startUpdates()
+startSync()
+startBackground()

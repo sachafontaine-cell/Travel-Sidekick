@@ -1,4 +1,4 @@
-// Plan: "All" is the master list (must-sees summary, Picked, Maybe, Eliminated); each day chip
+// Plan: "All" is the master list (must-sees summary, Picked, Maybe, Skipped); each day chip
 // shows that day's timeline. Days are views of the same list.
 import { useMemo, useRef, useState } from 'preact/hooks'
 import { BadgeChip, Icon, StateChip } from '../ui'
@@ -95,7 +95,7 @@ function All({ trip }: { trip: Trip }) {
 
       <Section trip={trip} title={`Picked (${picked.length})`} list={picked} status="picked" draggable={f.sort === 'mine'} />
       <Section trip={trip} title={`Maybe (${maybe.length})`} list={maybe} status="maybe" draggable={f.sort === 'mine'} />
-      <button class="fold press" aria-expanded={showOut} onClick={() => setShowOut(!showOut)}>Eliminated ({out.length}){showOut ? <Icon.up /> : <Icon.down />}</button>
+      {out.length > 0 && <button class="fold press" aria-expanded={showOut} onClick={() => setShowOut(!showOut)}>Skipped ({out.length}){showOut ? <Icon.up /> : <Icon.down />}</button>}
       {showOut && <Section trip={trip} list={out} status="out" draggable={false} />}
     </>
   )
@@ -106,8 +106,8 @@ function Section({ trip, title, list, status, draggable }: { trip: Trip; title?:
   if (!list.length && status === 'out') return null
   return (
     <div class="section">
-      {title && <div class="section-h"><span class="label">{title}</span>{status === 'picked' && list.length > 0 && <span class="muted small">Swipe ← to drop</span>}</div>}
-      {list.length === 0 ? <p class="muted small">Nothing here yet.</p> : (
+      {title && <div class="section-h"><span class="label">{title}</span>{status === 'picked' && list.length > 0 && <span class="muted small">Swipe ← to skip</span>}</div>}
+      {list.length === 0 ? <p class="muted small">{status === 'picked' ? 'Tap ○ on a place to pick it.' : 'Nothing here.'}</p> : (
         <div class="list" ref={ref}>
           {list.map((p, i) => <Row trip={trip} p={p} draggable={draggable} onGrip={(e) => ref.current && startDrag(e, ref.current, i, (from, to) => {
             const rest = list.filter((_, k) => k !== from)
@@ -119,13 +119,21 @@ function Section({ trip, title, list, status, draggable }: { trip: Trip; title?:
   )
 }
 
+/** ○ = Maybe, ✓ = Picked (tap to switch), ↺ on a skipped place brings it back. Swipe ← skips, → picks. */
+export function Tick({ p }: { p: Place }) {
+  const on = p.status === 'picked'
+  const act = () => setStatus(p.id, on ? 'maybe' : p.status === 'out' ? 'maybe' : 'picked')
+  const label = on ? `${p.name}: picked (tap for Maybe)` : p.status === 'out' ? `Bring back ${p.name}` : `Pick ${p.name}`
+  return <button class={`tick press${on ? ' on' : ''}${p.status === 'out' ? ' out' : ''}`} aria-label={label} aria-pressed={on} onClick={act}><span>{on ? <Icon.check /> : p.status === 'out' ? <Icon.refresh /> : null}</span></button>
+}
+
 function Row({ trip, p, draggable, onGrip }: { trip: Trip; p: Place; draggable: boolean; onGrip: (e: PointerEvent) => void }) {
-  const left = p.status === 'out' ? undefined : () => (p.must ? pushDown(p.id) : setStatus(p.id, p.status === 'picked' ? 'maybe' : 'out'))
+  const left = p.status === 'out' ? undefined : () => (p.must ? pushDown(p.id) : setStatus(p.id, 'out'))
   const right = p.status === 'picked' ? undefined : () => setStatus(p.id, p.status === 'out' ? 'maybe' : 'picked')
   const sw = swipeable(left, right)
-  const leftLabel = p.must ? 'To the bottom' : p.status === 'picked' ? 'Maybe' : 'Eliminate'
   return (
-    <div class={`prow${p.done ? ' done' : ''}`} data-drag data-left={leftLabel} data-right={p.status === 'out' ? 'Maybe' : 'Pick'} {...sw}>
+    <div class={`prow${p.done ? ' done' : ''}`} data-drag data-left={p.must ? 'To the bottom' : 'Skip'} data-right={p.status === 'out' ? 'Maybe' : 'Pick'} {...sw}>
+      <Tick p={p} />
       <button class="open press" onClick={() => open({ kind: 'card', place: p.id })}>
         <span class="name">{p.name}</span>
         <span class="meta"><BadgeChip p={p} />{p.scoring ? <span>Scoring…</span> : <span>Worth {p.worth} · {price(trip, p.price, false)}</span>}{p.day ? <span class="chip plain">Day {p.day}</span> : null}{p.done && <span class="chip plain">Done</span>}</span>
@@ -167,12 +175,14 @@ function Day({ trip, day }: { trip: Trip; day: number }) {
         </div>
       )}
       {slots.length === 0 ? (
-        <div class="empty"><p>Nothing planned yet. Open any place and use its Day button, or tap Fix it in All.</p></div>
+        <div class="empty"><p>Nothing planned yet.</p></div>
       ) : (
         <div class="list" ref={ref}>
           {slots.map((s, i) => <SlotRow trip={trip} s={s} first={i === 0} past={day < now.day || (day === now.day && s.end <= now.min)} onGrip={(e) => ref.current && startDrag(e, ref.current, i, dropAt)} />)}
         </div>
       )}
+      {day >= now.day && <button class="btn btn-secondary press" onClick={() => open({ kind: 'sheet', name: 'addday', arg: String(day) })}><Icon.plus />Add to this day</button>}
+      {slots.some((s) => s.place) && <p class="muted small center">Swipe ← to take a stop off this day.</p>}
     </>
   )
 }

@@ -15,12 +15,12 @@ export function setStatus(id: string, status: Status) {
   const p = one(id)
   if (!p || p.status === status) return
   if (p.must && status === 'out') return pushDown(id)
-  const label = status === 'out' ? `${p.name} eliminated` : status === 'picked' ? `${p.name} picked` : `${p.name} moved to Maybe`
-  // Eliminated places leave their day.
+  const label = status === 'out' ? `${p.name} skipped` : status === 'picked' ? `${p.name} picked` : `${p.name} moved to Maybe`
+  // Skipped places leave their day.
   put({ ...p, status, ...(status === 'out' ? { day: null } : {}) }, label)
 }
 
-/** Must-sees can't be eliminated: they go to the bottom of Picked instead. */
+/** Must-sees can't be skipped: they go to the bottom of the list instead. */
 export function pushDown(id: string) {
   const p = one(id)
   if (!p) return
@@ -79,6 +79,18 @@ export function moveInDay(trip: Trip, day: number, id: string, prev?: string, ne
   const list = dayPlaces(tripPlaces(trip.id), day)
   const lo = list.find((x) => x.id === prev), hi = list.find((x) => x.id === next)
   put({ ...p, dayRank: between(lo?.dayRank, hi?.dayRank) })
+}
+
+/** "Go now": put a place into today, right after what's happening now (or first, before the next stop). */
+export function addNow(trip: Trip, id: string, today: number, nowMin: number, slots: { id: string; kind: string; start: number; end: number }[]) {
+  const p = one(id)
+  if (!p) return
+  const list = dayPlaces(tripPlaces(trip.id), today).filter((x) => x.id !== id)
+  // The last place that has started by now; the new one goes right after it.
+  const startedIds = new Set(slots.filter((s) => s.kind === 'place' && s.start <= nowMin).map((s) => s.id))
+  const before = [...list].reverse().find((x) => startedIds.has(x.id))
+  const after = before ? list[list.indexOf(before) + 1] : list[0]
+  put({ ...p, day: today, dayRank: between(before?.dayRank, after?.dayRank), status: 'picked' }, `${p.name} added to today`)
 }
 
 export function applyProposal(pr: Proposal) {

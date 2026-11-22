@@ -55,7 +55,7 @@ export function Trips() {
           </div>
         </div>
       ))}
-      {DEMO && <div class="banner"><span class="dot" /><span class="grow small">Sample trip. Nothing here touches your own trips.</span><a class="link small" href={location.pathname}>Leave</a></div>}
+      {DEMO && <div class="banner"><span class="dot" /><span class="grow small">Sample trip. Your trips are untouched.</span><a class="link small" href={location.pathname}>Leave</a></div>}
 
       {now.length > 0 && <span class="label">Happening now</span>}
       {now.map((t) => {
@@ -87,7 +87,7 @@ export function Trips() {
 
       {!all.length && (
         <div class="empty">
-          <p>Plan your first trip: where, when and who's coming. The app builds the list and plans the days.</p>
+          <p>Where, when, who. The app builds the list and plans the days.</p>
           <button class="btn btn-primary press" onClick={() => { const t = newTrip(); go(tripPath(t.id, 'setup')) }}>+ New trip</button>
           <a class="link" href="?demo">See a sample trip</a>
         </div>

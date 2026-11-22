@@ -1,13 +1,14 @@
-// Small sheets: sort & filter, add a place, pick a day, a place's ⋯ menu, local rules.
+// Small sheets: sort & filter, add a place, add to a day, pick a day, local rules.
 import { useState } from 'preact/hooks'
-import { Icon, Sheet, Spinner } from '../ui'
+import { Icon, Sheet } from '../ui'
 import { places, save, tripPlaces, trips } from '../lib/data'
-import { close } from '../lib/nav'
+import { close, open } from '../lib/nav'
 import { createStore } from '../lib/store'
-import { pushDown, setDay, setDone, setStatus } from '../lib/actions'
+import { setDay } from '../lib/actions'
 import { scorePlace } from '../lib/ai'
 import { between, byRank } from '../lib/rank'
-import { dateOf, hoursOn, planDay, tripDays } from '../lib/planner'
+import { dateOf, dayPlaces, hoursOn, planDay, tripDays } from '../lib/planner'
+import { km } from '../lib/geo'
 import { shortDate, WEEKDAY, weekday } from '../lib/time'
 import { symbol } from '../lib/money'
 import type { Place, Trip } from '../lib/model'
@@ -36,34 +37,68 @@ export function FilterSheet({ trip }: { trip: Trip }) {
   )
 }
 
-export function AddSheet({ trip }: { trip: Trip }) {
+export function AddSheet({ trip, day }: { trip: Trip; day?: number }) {
   const [name, setName] = useState('')
-  const [err, setErr] = useState('')
-  const [busy, setBusy] = useState(false)
-  const add = async () => {
+  const add = async (status: 'picked' | 'maybe') => {
     const n = name.trim()
     if (!n) return
-    setBusy(true); setErr('')
-    // Shown at once as "Scoring…"; Gemini fills it in a couple of seconds.
+    // In the list at once ("Scoring…"); Gemini fills it in a few seconds.
     const last = tripPlaces(trip.id).sort(byRank).at(-1)
     const rank = between(last?.rank, undefined)
-    const temp: Place = { id: crypto.randomUUID(), trip: trip.id, name: n, kind: 'sight', lat: trip.base?.lat ?? trip.dest.lat, lng: trip.base?.lng ?? trip.dest.lng, badge: 'worth', must: false, worth: 0, value: 0, sub: { iconic: 0, vibe: 0, hassle: 0, kid: 0 }, rec: 'pay', recText: '', why: '', tip: '', price: 0, minutes: 60, suggested: 60, indoor: false, status: 'maybe', rank, day: null, scoring: true, at: Date.now() }
+    const onDay = day ? dayPlaces(tripPlaces(trip.id), day).at(-1) : undefined
+    const temp: Place = { id: crypto.randomUUID(), trip: trip.id, name: n, kind: 'sight', lat: trip.base?.lat ?? trip.dest.lat, lng: trip.base?.lng ?? trip.dest.lng, badge: 'worth', must: false, worth: 0, value: 0, sub: { iconic: 0, vibe: 0, hassle: 0, kid: 0 }, rec: 'pay', recText: '', why: '', tip: '', price: 0, minutes: 60, suggested: 60, indoor: false, status, rank, day: day ?? null, dayRank: day ? between(onDay?.dayRank, undefined) : undefined, scoring: true, at: Date.now() }
     save('place', [temp], `${n} added`)
-    setName('')
     close()
     try {
       const p = await scorePlace(trip, n, rank)
-      if (p && places.get()[temp.id]) save('place', [{ ...p, id: temp.id, status: places.get()[temp.id].status, scoring: false }])
+      const cur = places.get()[temp.id]
+      if (p && cur) save('place', [{ ...p, id: temp.id, status: cur.status, day: cur.day, dayRank: cur.dayRank, scoring: false }])
     } catch (e) {
-      if (places.get()[temp.id]) save('place', [{ ...places.get()[temp.id], scoring: false, why: e instanceof Error ? `Not scored: ${e.message}` : 'Not scored yet.' }])
-    } finally { setBusy(false) }
+      const cur = places.get()[temp.id]
+      if (cur) save('place', [{ ...cur, scoring: false, why: e instanceof Error ? `Not scored: ${e.message}` : 'Not scored yet.' }])
+    }
   }
   return (
-    <Sheet title="Add a place">
-      <p class="muted">Type a name you heard about. It appears in Maybe right away; Gemini scores it in a few seconds.</p>
-      <div class="row"><input class="field grow" placeholder="e.g. Musée Grévin" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') void add() }} />
-        <button class="btn btn-primary btn-sm press" disabled={!name.trim() || busy} onClick={add}>{busy ? <Spinner /> : 'Add'}</button></div>
-      {err && <p class="answer err">{err}</p>}
+    <Sheet title={day ? `Add to Day ${day}` : 'Add a place'}>
+      <input class="field" autoFocus enterKeyHint="done" placeholder="Name, e.g. Musée Grévin" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') void add('picked') }} />
+      <div class="row">
+        <button class="btn btn-primary grow press" disabled={!name.trim()} onClick={() => add('picked')}>{day ? `Add to Day ${day}` : 'Add to Picked'}</button>
+        {!day && <button class="btn btn-quiet press" disabled={!name.trim()} onClick={() => add('maybe')}>Maybe</button>}
+      </div>
+      <p class="muted small">Gemini scores it in a few seconds.</p>
+    </Sheet>
+  )
+}
+
+/** "+ Add to this day": places not planned yet, nearest to the day's stops first. One tap adds. */
+export function AddToDaySheet({ trip, day }: { trip: Trip; day: number }) {
+  const all = places.use()
+  const list = tripPlaces(trip.id)
+  const on = dayPlaces(list, day)
+  const date = dateOf(trip, day)
+  const centre = on.length ? { lat: on.reduce((a, p) => a + p.lat, 0) / on.length, lng: on.reduce((a, p) => a + p.lng, 0) / on.length } : trip.base ?? trip.dest
+  const [added, setAdded] = useState<string[]>([])
+  const candidates = list
+    .filter((p) => (p.day == null || added.includes(p.id)) && p.status !== 'out' && !p.done && !p.scoring && hoursOn(p, date) !== null)
+    .sort((a, b) => Number(b.must) - Number(a.must) || Number(b.status === 'picked') - Number(a.status === 'picked') || km(centre, a) - km(centre, b))
+    .slice(0, 12)
+  void all
+  return (
+    <Sheet title={`Add to Day ${day}`} foot={<button class="btn btn-primary grow press" onClick={close}>Done</button>}>
+      {candidates.length === 0 ? <p class="muted">Everything open that day is already planned.</p> : (
+        <div class="list">
+          {candidates.map((p) => {
+            const isOn = added.includes(p.id)
+            return (
+              <button class="kv press" aria-pressed={isOn} onClick={() => { if (isOn) { setDay(p.id, null); setAdded(added.filter((x) => x !== p.id)) } else { setDay(p.id, day); setAdded([...added, p.id]) } }}>
+                <span class="stack" style={{ gap: '1px', minWidth: 0 }}><span class="strong">{p.name}</span><span class="muted small">{p.must ? '★ Must-see · ' : ''}{Math.round(km(centre, p) * 10) / 10} km · {p.minutes} min</span></span>
+                {isOn ? <span class="chip ok"><Icon.check />Added</span> : <Icon.plus />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <button class="link press" onClick={() => { close(); setTimeout(() => open({ kind: 'sheet', name: 'add', arg: trip.id + '|' + day }), 0) }}>Something else…</button>
     </Sheet>
   )
 }
@@ -92,29 +127,12 @@ export function DaySheet({ trip, id }: { trip: Trip; id: string }) {
   )
 }
 
-export function MenuSheet({ id }: { id: string }) {
-  const p = places.use()[id]
-  if (!p) return null
-  const after = () => close()
-  return (
-    <Sheet title={p.name}>
-      <div class="list">
-        <button class="kv press" onClick={() => { setDone(p.id, !p.done); after() }}><span>{p.done ? 'Not done yet' : 'Mark as done'}</span><Icon.check /></button>
-        {p.status !== 'picked' && <button class="kv press" onClick={() => { setStatus(p.id, 'picked'); after() }}><span>Pick it</span></button>}
-        {p.status !== 'maybe' && !p.must && <button class="kv press" onClick={() => { setStatus(p.id, 'maybe'); after() }}><span>Move to Maybe</span></button>}
-        {p.must ? <button class="kv press" onClick={() => { pushDown(p.id); after() }}><span>Move to the bottom</span><span class="v">Must-sees can't be eliminated</span></button>
-          : p.status !== 'out' && <button class="kv press" onClick={() => { setStatus(p.id, 'out'); after() }}><span style={{ color: 'var(--danger)' }}>Eliminate</span></button>}
-      </div>
-    </Sheet>
-  )
-}
-
 export function RulesSheet({ trip }: { trip: Trip }) {
   const t = trips.use()[trip.id]
   return (
     <Sheet title={`Local rules · ${t.name}`}>
       {t.rules?.length ? <div class="list">{t.rules.map((r) => <div class="kv" style={{ flexDirection: 'column', alignItems: 'flex-start', padding: '12px 14px', gap: '2px' }}><b>{r.title}</b><span class="muted">{r.text}</span></div>)}</div>
-        : <p class="muted">Written by Gemini once the list is built (needs the key and a connection).</p>}
+        : <p class="muted">Written by Gemini with the list.</p>}
     </Sheet>
   )
 }

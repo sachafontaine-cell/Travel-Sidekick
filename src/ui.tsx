@@ -103,7 +103,7 @@ export function BadgeFull({ p }: { p: Pick<Place, 'must' | 'badge'> }) {
 const STATE: Record<MustState, [string, string]> = { done: ['Done', 'plain'], scheduled: ['Scheduled', 'ok'], risk: ['At risk', 'amber'], last: ['Last chance', 'red'], missed: ['No day left', 'red'] }
 export const StateChip = ({ s }: { s: MustState }) => <span class={`chip ${STATE[s][1]}`}>{STATE[s][0]}</span>
 
-/** "Moved to Eliminated · Undo" after every change that has a label. */
+/** "Louvre skipped · Undo" after every change that has a label. */
 export function UndoToast() {
   const c = lastChange.use()
   useEffect(() => {

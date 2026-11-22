@@ -26,20 +26,20 @@ function KeyBox() {
       settings.set({ ...settings.get(), geminiKey: k, geminiModel: models[0] })
       setKey(''); setChange(false)
       const shared = await shareKey(k)
-      setState({ ok: shared ? 'Key saved, and shared with the other phone.' : 'Key saved on this phone.' })
+      setState({ ok: shared ? 'Key saved and shared.' : 'Key saved on this phone.' })
     } catch (e) {
       if (e instanceof AiError && e.status === 0) {
         settings.set({ ...settings.get(), geminiKey: k, geminiModel: undefined })
         setKey(''); setChange(false)
-        setState({ ok: 'Key saved. No connection to check it now: it will be checked on first use.' })
+        setState({ ok: 'Key saved. Checked on first use.' })
       } else setState({ err: e instanceof Error ? e.message : 'Could not check the key.' })
     }
   }
   const paste = async () => {
     try {
       const t = await navigator.clipboard.readText()
-      if (t.trim()) { setKey(t.trim()); void save(t) } else setState({ err: 'The clipboard is empty: copy the key in AI Studio.' })
-    } catch { setState({ err: 'Paste was blocked: paste the key in the box below.' }) }
+      if (t.trim()) { setKey(t.trim()); void save(t) } else setState({ err: 'Clipboard empty: copy the key first.' })
+    } catch { setState({ err: 'Paste blocked: use the box below.' }) }
   }
   if (!change && s.geminiKey) {
     return (
@@ -53,8 +53,8 @@ function KeyBox() {
   return (
     <div class="stack">
       <ol class="muted" style={{ margin: 0, paddingLeft: '20px' }}>
-        <li>Open AI Studio, tap <b>Create API key</b>, and pick <b>Create in new project</b> (its own free allowance). Copy the key.</li>
-        <li>Come back here and tap <b>Paste key</b>.</li>
+        <li>In AI Studio: <b>Create API key</b> → <b>Create in new project</b>. Copy it.</li>
+        <li>Tap <b>Paste key</b>.</li>
       </ol>
       <a class="btn btn-secondary press" href={AI_STUDIO} target="_blank" rel="noopener">Get a key<Icon.out /></a>
       {'clipboard' in navigator && <button class="btn btn-primary press" disabled={!!state.busy} onClick={paste}>Paste key</button>}
@@ -64,7 +64,7 @@ function KeyBox() {
       </div>
       {state.busy && <div class="row muted"><Spinner />{state.busy}</div>}
       {state.err && <p class="answer err">{state.err}</p>}
-      <p class="muted small">Free: never turn on billing in that Google project. The key stays on your phones, never in a backup or the code.</p>
+      <p class="muted small">Free as long as billing stays off. Stored only on your phones.</p>
     </div>
   )
 }
@@ -84,8 +84,8 @@ function Family() {
   if (!connected()) return (
     <div class="stack">
       {bad && <p class="answer err">The family link's script address is wrong ("{bad}"). It must end with the Web app URL: https://script.google.com/macros/s/…/exec (Deploy → Manage deployments).</p>}
-      <p class="muted">Not connected. Open the family link once on this phone (from the Google script setup). Until then, everything stays on this phone.</p>
-      {familyKey() && <p class="muted small">Family key found (Control Center); the script address is still missing.</p>}
+      <p class="muted">Not connected. Open the family link once on this phone.</p>
+      {familyKey() && <p class="muted small">Family key found; script address missing.</p>}
     </div>
   )
   const ago = st.at ? Math.max(0, Math.round((Date.now() - st.at) / 60000)) : null
@@ -107,7 +107,7 @@ function FamilyLink() {
   const share = async () => { try { await navigator.share({ title: 'Travel Sidekick family link', text: 'Open once on your phone (keep it private):', url: link }) } catch { /* closed */ } }
   return (
     <div class="stack">
-      <span class="muted small">Family link: open it once on the other phone. It holds the family key, so keep it private.</span>
+      <span class="muted small">Open once on the other phone. Keep it private.</span>
       <div class="row">
         <button class="btn btn-quiet btn-sm grow press" onClick={copy}>Copy link</button>
         {'share' in navigator && <button class="btn btn-quiet btn-sm grow press" onClick={share}>Share</button>}
@@ -123,15 +123,15 @@ function Alerts() {
   const s = settings.use()
   const [text, setText] = useState((s.alerts ?? []).join(', '))
   const [msg, setMsg] = useState('')
-  if (!connected()) return <p class="muted">Email alerts come from the family script: connect it first.</p>
+  if (!connected()) return <p class="muted">Connect the family script first.</p>
   const save = async () => {
     const emails = text.split(/[,\s]+/).map((x) => x.trim()).filter((x) => /.+@.+\..+/.test(x))
     settings.set({ ...settings.get(), alerts: emails })
-    try { await setAlerts(emails); setMsg('Saved.') } catch { setMsg('Saved here; the script could not be reached. Try again later.') }
+    try { await setAlerts(emails); setMsg('Saved.') } catch { setMsg('Saved here. Script unreachable: try later.') }
   }
   return (
     <div class="stack">
-      <p class="muted small">Must-see closed on its day, and the "download the language" reminder 3 days before.</p>
+      <p class="muted small">Must-see closed, and the language reminder.</p>
       <div class="row"><input class="field grow" type="email" inputMode="email" placeholder="you@example.com, partner@example.com" value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} /><button class="btn btn-primary btn-sm press" onClick={save}>Save</button></div>
       {msg && <p class="muted small">{msg}</p>}
     </div>
@@ -154,11 +154,11 @@ function Kayak() {
   const [msg, setMsg] = useState('')
   if (!connected()) return <p class="muted">Connect the family script first.</p>
   const save = async () => {
-    try { await setKayak(url.trim()); settings.set({ ...settings.get(), kayak: url.trim() }); setMsg(url.trim() ? 'Saved. Find my trips now reads it too.' : 'Removed.') } catch (e) { setMsg(e instanceof Error ? e.message : 'Could not save.') }
+    try { await setKayak(url.trim()); settings.set({ ...settings.get(), kayak: url.trim() }); setMsg(url.trim() ? 'Saved.' : 'Removed.') } catch (e) { setMsg(e instanceof Error ? e.message : 'Could not save.') }
   }
   return (
     <div class="stack">
-      <p class="muted small">KAYAK has no way for apps to sign in, but KAYAK Trips can share a private calendar link: in KAYAK, Trips → Settings → Calendar sync → copy the link.</p>
+      <p class="muted small">KAYAK → Trips → Settings → Calendar sync → copy the link.</p>
       <div class="row"><input class="field grow" inputMode="url" placeholder="https://www.kayak.com/trips/ical/…" value={url} onInput={(e) => setUrl((e.target as HTMLInputElement).value)} /><button class="btn btn-primary btn-sm press" onClick={save}>Save</button></div>
       {msg && <p class="muted small">{msg}</p>}
     </div>
@@ -170,9 +170,9 @@ export function AppSheet() {
     <Sheet title="This app">
       <div class="stack"><span class="label">This phone</span><Me /></div>
       <div class="stack"><span class="label">Gemini key</span><KeyBox /></div>
-      <div class="stack"><span class="label">Family script (sync, emails)</span><Family /></div>
+      <div class="stack"><span class="label">Family script</span><Family /></div>
       <div class="stack"><span class="label">Email alerts</span><Alerts /></div>
-      <div class="stack"><span class="label">KAYAK calendar (optional)</span><Kayak /></div>
+      <div class="stack"><span class="label">KAYAK (optional)</span><Kayak /></div>
       <a class="link press" style={{ alignSelf: 'center' }} href="https://github.com/sachafontaine-cell/Travel-Sidekick#one-time-setup" target="_blank" rel="noopener">Setup guide<Icon.out /></a>
       <Version />
     </Sheet>

@@ -16,8 +16,8 @@ export function EmailCheck({ label = 'Bookings from your email' }: { label?: str
   const old = (st.script ?? 0) < SCRIPT_NEEDED
   const scan = st.scan
   const waiting = st.asked && (!scan || scan.at < st.asked) && Date.now() - st.asked < 5 * 60000
-  const line = old ? 'The family script is updating itself (see ⚙ if this stays).'
-    : waiting ? 'Checking your email in the background… new bookings appear here in a minute or two.'
+  const line = old ? 'Script updating… (see ⚙ if this stays)'
+    : waiting ? 'Checking email… results in a minute or two.'
     : scan?.error ? `Last check failed: ${scan.error}`
     : scan ? `Checked ${ago(scan.at)}${scan.added ? ` · ${scan.added} booking${scan.added > 1 ? 's' : ''} added` : ''}${scan.trips ? ` · ${scan.trips} new trip${scan.trips > 1 ? 's' : ''}` : ''} · checks every hour`
     : 'Checked every hour, in the background.'

@@ -24,8 +24,8 @@ export function Rebalance({ trip }: { trip: Trip }) {
         <button class="btn btn-primary press" style={{ flex: 2 }} disabled={!keep.length} onClick={() => { applyProposal({ ...pr, places: pr.places.filter((p) => !off.has(p.id)) }); close() }}>Apply {keep.length} change{keep.length === 1 ? '' : 's'}</button>
         <button class="btn btn-secondary press" style={{ flex: 1 }} onClick={close}>Not now</button>
       </> : undefined}>
-      {pr.changes.length ? <p class="muted">Keeps bookings, opening hours, downtime and your walking limit. Today stays as it is.</p>
-        : <p>All good: every must-see fits and no day runs late or too far.</p>}
+      {pr.changes.length ? <p class="muted">Keeps bookings, hours, downtime and walking limit. Today stays as is.</p>
+        : <p>All good: every must-see fits.</p>}
       {pr.changes.map((c) => (
         <label class="check card" style={{ alignItems: 'flex-start', padding: '12px' }}>
           <input type="checkbox" checked={!off.has(c.id)} onChange={() => { const n = new Set(off); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); setOff(n) }} />

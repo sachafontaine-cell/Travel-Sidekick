@@ -4,7 +4,7 @@ import { useState } from 'preact/hooks'
 import { Icon } from '../ui'
 import { nowIn, places, plansFor, save, settings, tripPlaces, trips } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
-import { setDay, setDone } from '../lib/actions'
+import { addNow, setDay, setDone } from '../lib/actions'
 import { mustInfo, countdown } from '../lib/musts'
 import { gapNow, ideas } from '../lib/whatnow'
 import { kidBuffer } from '../lib/people'
@@ -23,7 +23,7 @@ function BeforeYouGo({ trip }: { trip: Trip }) {
   const lang = langName(trip.dest.lang)
   const items: [string, string, string?][] = []
   if (trip.dest.lang !== 'en') items.push(['lang', `Download ${lang} in Google Translate`, translateUrl(trip)])
-  items.push(['maps', `Download ${trip.name} in Google Maps for offline use`, 'https://www.google.com/maps'])
+  items.push(['maps', `Download ${trip.name} in Google Maps`, 'https://www.google.com/maps'])
   const ready = trip.ready ?? {}
   const tick = (k: string) => save('trip', [{ ...trips.get()[trip.id], ready: { ...ready, [k]: !ready[k] } }])
   return (
@@ -33,7 +33,7 @@ function BeforeYouGo({ trip }: { trip: Trip }) {
         {items.map(([k, text, url]) => (
           <div class="check">
             <input type="checkbox" aria-label={text} checked={!!ready[k]} onChange={() => tick(k)} />
-            <span class="grow">{text}<br /><span class="muted small">So it works with no signal.{k === 'lang' ? ' Reminder by email 3 days before.' : ''}</span></span>
+            <span class="grow">{text}<br /><span class="muted small">Works with no signal.{k === 'lang' ? ' Email reminder 3 days before.' : ''}</span></span>
             {url && <a class="iconbtn ring press" href={url} target="_blank" rel="noopener" aria-label={`Open: ${text}`}><Icon.out /></a>}
           </div>
         ))}
@@ -87,7 +87,7 @@ export function Today({ trip }: { trip: Trip }) {
       <main class="main">
         <TripBar />
         {header('Trip over', trip.name)}
-        <p class="muted">Welcome home. The plan stays here if you want to look back.</p>
+        <p class="muted">Welcome home.</p>
         <button class="btn btn-secondary press" onClick={() => go('#/', true)}>All trips</button>
       </main>
     )
@@ -95,8 +95,8 @@ export function Today({ trip }: { trip: Trip }) {
 
   const plan = plansFor(trip)[now.day - 1]
   const slots = plan?.slots ?? []
-  // "Done?" is for things you choose to do; bookings (flights, tickets) just happen.
-  const asked = slots.filter((x) => x.place && !x.place.booked && x.end <= now.min && !x.place.done && x.place.status !== 'out')
+  // "Done?" is for things you choose to do, plus booked must-sees (they count). Flights just happen.
+  const asked = slots.filter((x) => x.place && (!x.place.booked || x.place.must) && x.end <= now.min && !x.place.done && x.place.status !== 'out')
   const next = slots.find((x) => x.end > now.min)
   const energy: Energy = s.energy?.date === now.date ? s.energy.level : 'ok'
   const gap = gapNow(trip, plan, now.min)
@@ -140,9 +140,12 @@ export function Today({ trip }: { trip: Trip }) {
               <span class="muted small">{idea.travel.minutes} min {idea.travel.mode === 'metro' ? 'metro' : 'walk'} · {short(trip, idea.place.price)} · {idea.minutes} min · {idea.place.why}</span>
             </span>
           </button>
-          {list.length > 1 && <button class="btn btn-quiet btn-sm press" onClick={() => setPick(pick + 1)}>Another idea</button>}
+          <div class="row">
+            <button class="btn btn-primary btn-sm grow press" onClick={() => { addNow(trip, idea.place.id, now.day, now.min, slots); setPick(0) }}>Go now</button>
+            {list.length > 1 && <button class="btn btn-quiet btn-sm grow press" onClick={() => setPick(pick + 1)}>Another idea</button>}
+          </div>
           <div class="stack" style={{ gap: '4px' }}>
-            <span class="muted small">How's everyone?</span>
+            <span class="muted small">Energy</span>
             <div class="energy" role="group" aria-label="Energy">
               {(['tired', 'ok', 'fresh'] as Energy[]).map((e) => <button class={`pill press${energy === e ? ' on' : ''}`} aria-pressed={energy === e} onClick={() => { settings.set({ ...settings.get(), energy: { date: now.date, level: e } }); setPick(0) }}>{e === 'tired' ? 'Tired' : e === 'ok' ? 'OK' : 'Fresh'}</button>)}
             </div>

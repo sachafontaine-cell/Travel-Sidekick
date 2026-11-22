@@ -48,7 +48,7 @@ export function Setup({ trip }: { trip: Trip }) {
         {row('shape', 'Day shape', `${PACE.find((p) => p[0] === t.pace)![1]} · ${clock(t.dayStart)}–${clock(t.dayEnd)}`)}
         {row('food', 'Food & hard nos', t.nos.length ? `${t.nos.length} hard no${t.nos.length > 1 ? 's' : ''}` : t.food ? 'Set' : 'Optional')}
       </div>
-      <p class="muted small">Must-sees are always included. Bookings are read from your email when the family script is connected.</p>
+      <p class="muted small">Must-sees always included. Bookings come from your email.</p>
       {!t.built && <button class="btn btn-primary press" disabled={!ready} onClick={() => go(tripPath(t.id, 'start'))}>Build my list</button>}
       {!t.built && !ready && <p class="muted small" style={{ textAlign: 'center' }}>Needs where, when and who's coming.</p>}
       {t.built && <button class="btn btn-secondary press" onClick={() => go(tripPath(t.id, 'plan'), true)}>See the plan</button>}
@@ -90,7 +90,7 @@ export function WhereSheet({ id }: { id: string }) {
       </div>
       {t.start && t.end && <p class="muted">{tripDays(t)} days</p>}
       {t.dest.name && <>
-        <label class="fieldrow"><span>Hotel or home base (for downtime and walking times)</span><input class="field" placeholder={t.base?.name ?? 'Hotel name or address'} value={hq} onInput={(e) => setHq((e.target as HTMLInputElement).value)} /></label>
+        <label class="fieldrow"><span>Hotel or home base</span><input class="field" placeholder={t.base?.name ?? 'Hotel name or address'} value={hq} onInput={(e) => setHq((e.target as HTMLInputElement).value)} /></label>
         {hotels.list.length > 0 && <div class="list">{hotels.list.map((h) => <button class="kv press" onClick={() => { set(t, { base: h }); setHq('') }}><span>{h.name}</span></button>)}</div>}
       </>}
     </Sheet>
@@ -119,7 +119,7 @@ export function WhoSheet({ id }: { id: string }) {
           </div>
         )
       })}
-      <button class="btn btn-quiet press" onClick={() => set(t, { people: [...t.people, { id: uid(), name: '', age: t.people.length < 2 ? 40 : 10 }] })}>+ Add person (age sets the walking limit)</button>
+      <button class="btn btn-quiet press" onClick={() => set(t, { people: [...t.people, { id: uid(), name: '', age: t.people.length < 2 ? 40 : 10 }] })}>+ Add person</button>
       {t.people.length > 0 && <p class="card card-pad">Group walking limit: <b>{limit.miles} mi</b> <span class="hint">(lowest: {limit.who || 'someone'}{t.pace !== 'balanced' ? `, ${t.pace} pace` : ''})</span>. Breaks every hour with kids.</p>}
     </Sheet>
   )
@@ -133,7 +133,7 @@ export function VibeSheet({ id }: { id: string }) {
   const total = Object.values(t.vibes).reduce((a, n) => a + (n ?? 0), 0)
   return (
     <Sheet title="Vibe">
-      <p class="muted">Pick as many as you like. + takes from the biggest share, − gives to it; the total stays 100%. Tap a name to see what it means. <span class="hint">(suggested: {describe(sug, VIBE_NAMES)})</span></p>
+      <p class="muted">Pick any. +/− sets the mix (total 100%). Tap a name for what it means. <span class="hint">(suggested: {describe(sug, VIBE_NAMES)})</span></p>
       <div>
         {VIBES.map((v) => (
           <>
@@ -178,7 +178,7 @@ export function ShapeSheet({ id }: { id: string }) {
     <Sheet title="Day shape">
       <div class="stack"><span class="muted">Pace <span class="hint">(suggested: Balanced{t.people.some((p) => p.age < 10) ? ' with kids under 10' : ''})</span></span>
         <Seg label="Pace" options={PACE} value={t.pace} onChange={(v) => { const n = PACE_DEFAULTS[v]; set(t, { pace: v, dayStart: n.dayStart, dayEnd: n.dayEnd, downtime: { ...t.downtime, minutes: n.downtime } }) }} />
-        <p class="muted small">Pace sets the defaults below and how far the group walks.</p>
+        <p class="muted small">Pace sets the defaults and walking distance.</p>
       </div>
       <div>
         <Stepper label="Day starts" hint={`(suggested ${clock(d.dayStart)})`} value={t.dayStart} show={(v) => clock(v)} step={15} min={300} max={t.dayEnd - 120} custom={t.dayStart !== d.dayStart} onChange={(v) => set(t, { dayStart: v })} />
@@ -189,7 +189,7 @@ export function ShapeSheet({ id }: { id: string }) {
         </div>
         {t.downtime.on && <Stepper label="Downtime length" hint={`(suggested ${duration(d.downtime)})`} value={t.downtime.minutes} show={duration} step={15} min={30} max={240} custom={t.downtime.minutes !== d.downtime} onChange={(v) => set(t, { downtime: { ...t.downtime, minutes: v } })} />}
       </div>
-      <p class="muted small">Downtime is fitted into each day like an activity, after lunch when it can. Drag it in Plan to move it. Booked tickets keep their time even outside these hours.</p>
+      <p class="muted small">Downtime fits in like an activity, after lunch when it can. Bookings keep their time.</p>
     </Sheet>
   )
 }

@@ -41,7 +41,7 @@ export interface Place {
   lat: number
   lng: number
   badge: Badge
-  /** The family's call (starts as the AI's). Must-sees are never eliminated. */
+  /** The family's call (starts as the AI's). Must-sees are never skipped. */
   must: boolean
   worth: number
   value: number

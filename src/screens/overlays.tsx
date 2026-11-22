@@ -6,7 +6,7 @@ import { Card } from './card'
 import { Ask } from './ask'
 import { Rebalance } from './rebalance'
 import { AppSheet } from './settings'
-import { AddSheet, DaySheet, FilterSheet, MenuSheet, RulesSheet } from './sheets'
+import { AddSheet, AddToDaySheet, DaySheet, FilterSheet, RulesSheet } from './sheets'
 import { SETUP_SHEETS } from './setup'
 
 export function Overlays({ trip }: { trip?: Trip }) {
@@ -23,9 +23,9 @@ export function Overlays({ trip }: { trip?: Trip }) {
         if (o.kind === 'ask') return <Ask trip={t} place={o.place} />
         if (o.kind === 'rebalance') return <Rebalance trip={t} />
         if (o.name === 'filter') return <FilterSheet trip={t} />
-        if (o.name === 'add') return <AddSheet trip={t} />
+        if (o.name === 'add') { const d = Number(o.arg?.split('|')[1]) || undefined; return <AddSheet trip={t} day={d} /> }
+        if (o.name === 'addday' && o.arg) return <AddToDaySheet trip={t} day={Number(o.arg)} />
         if (o.name === 'day' && o.arg) return <DaySheet trip={t} id={o.arg} />
-        if (o.name === 'menu' && o.arg) return <MenuSheet id={o.arg} />
         if (o.name === 'rules') return <RulesSheet trip={t} />
         return null
       })}

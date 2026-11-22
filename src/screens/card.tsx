@@ -4,7 +4,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { BadgeFull, Dialog, Icon, Stepper } from '../ui'
 import { nowIn, places, plansFor } from '../lib/data'
 import { close, open, replaceTop } from '../lib/nav'
-import { setMinutes, setMust } from '../lib/actions'
+import { setDone, setMinutes, setMust, setStatus } from '../lib/actions'
 import { dateOf, hoursOn } from '../lib/planner'
 import { clock, duration } from '../lib/time'
 import { price } from '../lib/money'
@@ -57,20 +57,29 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
           <div class="stat" style={{ textAlign: 'right' }}><span class="muted small">Price</span><span class="big num" style={{ fontSize: '20px' }}>{price(trip, p.price)}</span>{p.price > 0 && <span class="muted small">{price(trip, group, false)} for {trip.people.length}</span>}</div>
         </div>
       )}
-      {p.recText && <p><b>{REC[p.rec]}.</b> {cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?)[:.,]?\s*/i, ''))}</p>}
+      {p.recText && <p><b>{REC[p.rec]}.</b> {cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?)[:.,;]?\s*/i, ''))}</p>}
+
+      {/* Where it stands: one tap, always visible. Must-sees can't be skipped. */}
+      <div class="seg" role="group" aria-label="In the plan">
+        {(['picked', 'maybe', 'out'] as const).map((s) => s === 'out' && p.must ? null : (
+          <button class={p.status === s ? 'on press' : 'press'} aria-pressed={p.status === s} onClick={() => setStatus(p.id, s)}>{s === 'picked' ? 'Pick' : s === 'maybe' ? 'Maybe' : 'Skip'}</button>
+        ))}
+      </div>
+      {p.status !== 'out' && (
+        <div class="row">
+          <button class="btn btn-primary grow press" onClick={() => open({ kind: 'sheet', name: 'day', arg: p.id })}>{day ? `Day ${day}${slot ? ` · ${clock(slot.start)}` : ''}` : 'Add to a day'} <Icon.down /></button>
+          {day != null && <button class={`btn btn-sm press ${p.done ? 'btn-primary' : 'btn-quiet'}`} aria-pressed={!!p.done} onClick={() => setDone(p.id, !p.done)}><Icon.check />Done</button>}
+        </div>
+      )}
 
       <div class="banner" style={{ padding: '6px 6px 6px 14px' }}>
         <span class="grow small">{h === undefined ? 'Hours not known yet' : h === null ? <b style={{ color: 'var(--red)' }}>Closed {day ? `on Day ${day}` : 'today'}</b> : <><b>Open {clock(h[0])}–{clock(h[1])}</b>{day ? ` on Day ${day}` : ' today'}</>}
-          <br /><span class="muted">{checked ? `Checked with Google · ${checked}` : 'From Gemini; checked with Google the morning before'}</span></span>
+          <br /><span class="muted">{checked ? `Checked with Google · ${checked}` : 'Checked with Google each morning'}</span></span>
         <a class="btn btn-quiet btn-sm press" href={maps} target="_blank" rel="noopener">Check hours<Icon.out /></a>
       </div>
 
       <Stepper label="Time there" hint={`(suggested ${duration(p.suggested)})`} value={p.minutes} show={duration} step={15} min={15} max={600} custom={p.minutes !== p.suggested} onChange={(v) => setMinutes(p.id, v)} />
 
-      <div class="row">
-        <button class="btn btn-primary grow press" onClick={() => open({ kind: 'sheet', name: 'day', arg: p.id })}>{day ? `Day ${day}${slot ? ` · ${clock(slot.start)}` : ''}` : 'Add to a day'} <Icon.down /></button>
-        <button class="iconbtn ring press" aria-label="More: done, maybe, eliminate" onClick={() => open({ kind: 'sheet', name: 'menu', arg: p.id })}><Icon.dots /></button>
-      </div>
       <button class="btn btn-quiet press" onClick={() => replaceTop({ kind: 'ask', place: p.id })}><Icon.chat />Ask about this</button>
 
       <a class="link press" href={maps} target="_blank" rel="noopener">Photos on Google Maps<Icon.out /></a>

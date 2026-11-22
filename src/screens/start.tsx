@@ -34,7 +34,7 @@ export function Start({ trip }: { trip: Trip }) {
       if (connected()) {
         // Email is read by the family script in the background: nothing here waits for it.
         void scanEmail().catch(() => {})
-        step(i, 'Bookings from your email: added in the background as they are found', true)
+        step(i, 'Bookings from your email', true)
         i++
       }
       step(i, 'Finding places for your family…')
@@ -49,7 +49,7 @@ export function Start({ trip }: { trip: Trip }) {
       step(i + 1, 'Planning the days…')
       const planned = autoPlan({ ...trip, base }, all)
       setFound(planned)
-      step(i + 1, 'Days planned (hours checked with Google each morning)', true)
+      step(i + 1, 'Days planned', true)
       if (base !== trip.base) save('trip', [{ ...trips.get()[trip.id], base }])
       setPhase('confirm')
     } catch (e) {
@@ -89,12 +89,12 @@ export function Start({ trip }: { trip: Trip }) {
       </div>
       {!s.geminiKey ? (
         <div class="card card-pad stack">
-          <p>The list is made by Gemini (free). Add your key once; both phones share it.</p>
+          <p>Gemini (free) builds the list. Add your key once.</p>
           <button class="btn btn-primary press" onClick={() => open({ kind: 'sheet', name: 'app' })}>Add the Gemini key</button>
         </div>
       ) : (
         <>
-          <p class="muted">About 20 seconds, once per trip. Everything after this is instant.</p>
+          <p class="muted">About 20 seconds, once per trip.</p>
           <div class="card card-pad stack">
             {steps.map((st) => <div class="row">{st.done ? <span style={{ color: 'var(--success)' }}><Icon.check /></span> : <Spinner />}<span class={st.done ? '' : 'hint'}>{st.text}</span></div>)}
             {phase === 'error' && <><p class="answer err">{err}</p><button class="btn btn-primary press" onClick={run}>Try again</button></>}

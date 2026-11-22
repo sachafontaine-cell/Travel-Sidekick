@@ -14,6 +14,7 @@ import { clock, shortDate, WEEKDAY, weekday } from '../lib/time'
 import { price } from '../lib/money'
 import { km } from '../lib/geo'
 import { byRank } from '../lib/rank'
+import { groupOf, type Group } from '../lib/groups'
 import { filters, type Filters } from './sheets'
 import { TripBar } from './tripbar'
 import type { Place, Status, Trip } from '../lib/model'
@@ -96,8 +97,8 @@ function All({ trip }: { trip: Trip }) {
 
       <div class="section-h"><span class="label">Activities · {ticked} checked</span>{list.length > 0 && <span class="muted small">Check what you want</span>}</div>
       {f.group === false ? <Section trip={trip} list={list} status="picked" draggable={f.sort === 'mine'} />
-        : GROUPS.map(([name, kinds]) => {
-          const g = list.filter((p) => kinds.includes(p.kind))
+        : GROUPS.map(([name, key]) => {
+          const g = list.filter((p) => groupOf(p) === key)
           return g.length ? <Section trip={trip} title={name} hint={`${g.filter((p) => p.status === 'picked').length} of ${g.length}`} list={g} status="picked" draggable={f.sort === 'mine'} /> : null
         })}
       {list.length === 0 && <p class="muted small">Nothing here. Tap + Add.</p>}
@@ -109,7 +110,7 @@ function All({ trip }: { trip: Trip }) {
 }
 
 /** Type groups, in this order. */
-const GROUPS: [string, Place['kind'][]][] = [['Sights', ['sight']], ['Museums', ['museum']], ['Parks & play', ['park']], ['Shows', ['show']], ['Food', ['meal', 'snack']], ['Shopping', ['shop']], ['Other', ['other']]]
+const GROUPS: [string, Group][] = [['Sights & landmarks', 'sight'], ['Museums', 'museum'], ['Outdoors & beaches', 'outdoors'], ['Tours & activities', 'tour'], ['Kids & animals', 'kids'], ['Shows & nightlife', 'show'], ['Food & drink', 'food'], ['Shopping & markets', 'shop'], ['Other', 'other']]
 
 /** Places that didn't fit the last time "Plan my days" ran (so the bar doesn't nag about them). */
 const unfitIds = createStore<string[]>([])

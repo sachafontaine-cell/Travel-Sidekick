@@ -7,7 +7,7 @@ import { youngKids } from './people'
 export interface Idea { place: Place; travel: Leg; minutes: number }
 export interface Gap { minutes: number; next?: Slot; here?: Point }
 
-const REST: Place['kind'][] = ['park', 'snack']
+const REST: Place['kind'][] = ['park', 'outdoors', 'kids', 'snack']
 
 /** The free time before the next stop (or the end of the day). */
 export function gapNow(trip: Trip, plan: DayPlan | undefined, now: number, here?: Point): Gap {

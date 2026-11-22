@@ -42,12 +42,12 @@ export function tripBrief(t: Trip): string {
 }
 
 const FIELDS = `Each place is one JSON object on its own line (JSON Lines, no array, no prose, no code fences):
-{"name":"","kind":"sight|museum|park|meal|snack|show|shop|other","lat":0,"lng":0,"badge":"must|worth|depends|trap|gem","must":true,"worth":0-10,"value":0-10,"sub":{"iconic":0-10,"vibe":0-10,"hassle":0-10,"kid":0-10},"rec":"pay|cheaper|skip","recText":"one sentence, max 90 chars","why":"max 70 chars","tip":"max 100 chars","price":adult price per person in local currency (0 if free),"minutes":time to spend there with this family,"indoor":true|false,"hours":["Sun","Mon","Tue","Wed","Thu","Fri","Sat" each as "HH:MM-HH:MM" or "closed"],"wiki":"exact English Wikipedia article title about this exact place, or null"}
-Rules: "hassle" is LOW hassle (10 = easy). "value" = worth per money compared with similar options. "must" only for the true can't-miss sights (6 to 10 of them). Never mark a must-see "skip". Be honest about tourist traps. "meal" = sit-down lunch/dinner places near the main sights; "snack" = bakeries, ice cream, quick bites.`
+{"name":"","kind":"sight|museum|outdoors|tour|kids|meal|snack|show|shop|other","lat":0,"lng":0,"badge":"must|worth|depends|trap|gem","must":true,"worth":0-10,"value":0-10,"sub":{"iconic":0-10,"vibe":0-10,"hassle":0-10,"kid":0-10},"rec":"pay|cheaper|skip","recText":"one sentence, max 90 chars","why":"max 70 chars","tip":"max 100 chars","price":adult price per person in local currency (0 if free),"minutes":time to spend there with this family,"indoor":true|false,"hours":["Sun","Mon","Tue","Wed","Thu","Fri","Sat" each as "HH:MM-HH:MM" or "closed"],"wiki":"exact English Wikipedia article title about this exact place, or null"}
+Rules: "hassle" is LOW hassle (10 = easy). "value" = worth per money compared with similar options. "must" only for the true can't-miss sights (6 to 10 of them). Never mark a must-see "skip". Be honest about tourist traps. "meal" = sit-down lunch/dinner places near the main sights; "snack" = bakeries, ice cream, quick bites. Kinds: "sight" = landmarks, monuments, viewpoints, neighbourhoods; "outdoors" = parks, gardens, beaches, hikes, nature; "tour" = guided tours, boat trips, snorkeling, classes, excursions; "kids" = zoos, aquariums, theme and water parks, playgrounds; "show" = performances, concerts, nightlife; "shop" = shops and markets.`
 
 interface RawPlace { name: string; kind: Kind; lat: number; lng: number; badge: Badge; must: boolean; worth: number; value: number; sub: Place['sub']; rec: Place['rec']; recText: string; why: string; tip: string; price: number; minutes: number; indoor: boolean; hours?: string[]; wiki?: string | null }
 
-const KINDS: Kind[] = ['sight', 'museum', 'park', 'meal', 'snack', 'show', 'shop', 'other']
+const KINDS: Kind[] = ['sight', 'museum', 'outdoors', 'tour', 'kids', 'meal', 'snack', 'show', 'shop', 'other']
 const clamp = (n: unknown, lo = 0, hi = 10) => Math.min(hi, Math.max(lo, Number(n) || 0))
 
 function parseHours(h?: string[]): Hours | undefined {

@@ -20,8 +20,11 @@ export const BADGE: Record<Badge, string> = { must: 'Must-see', worth: 'Worth it
 /** Where a place sits in the master list. */
 export type Status = 'picked' | 'maybe' | 'out'
 
-/** 'meal' = a sit-down lunch or dinner (the planner keeps it at meal times); 'snack' has no meal rule. */
-export type Kind = 'sight' | 'museum' | 'park' | 'meal' | 'snack' | 'show' | 'shop' | 'other'
+/**
+ * 'meal' = a sit-down lunch or dinner (the planner keeps it at meal times); 'snack' has no meal rule.
+ * 'park' is the old name for outdoors (places saved before the 8 groups); see groupOf.
+ */
+export type Kind = 'sight' | 'museum' | 'outdoors' | 'tour' | 'kids' | 'show' | 'meal' | 'snack' | 'shop' | 'other' | 'park'
 
 /** Opening hours per weekday, Sunday first. null = closed that day. */
 export interface Hours {

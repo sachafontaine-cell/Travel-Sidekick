@@ -2,16 +2,20 @@
 // the phone first and sent in the background; the other phone pulls them when opened and every
 // minute while open. The newest change wins, per place / day / trip.
 import { createStore, DEMO } from './store'
+import type { Destination } from './model'
 import { merge, outbox, settings, whenChanged, type Rec } from './data'
 import { afterMerge } from './found'
 
 /** The script version this app needs; an older script is asked to update itself. */
-export const SCRIPT_NEEDED = 3
+export const SCRIPT_NEEDED = 4
 
 export const cursor = createStore<number>(0, 'cursor')
 /** The script's last email check: when, what it added, or why it failed. */
 export interface Scan { at: number; added?: number; trips?: number; error?: string }
-export const syncState = createStore<{ at?: number; error?: string; script?: number; scan?: Scan | null; asked?: number }>({}, 'sync-state')
+export interface Booking { name: string; kind: string; date: string; time?: string; lat?: number | null; lng?: number | null; note?: string }
+/** A trip the script found in email that the family hasn't made: shown with Add / Not this one. */
+export interface FoundTrip { id: string; destination: string; dest: Destination; start: string; end: string; bookings: Booking[] }
+export const syncState = createStore<{ at?: number; error?: string; script?: number; scan?: Scan | null; asked?: number; found?: FoundTrip[] }>({}, 'sync-state')
 
 /** The family key from the link, or the Control Center's on this phone (same web address). */
 export function familyKey(): string {
@@ -45,13 +49,13 @@ export async function syncNow(): Promise<void> {
   try {
     const sending = outbox.get()
     const s = settings.get()
-    const res = await call<{ now: number; recs: Rec[]; v: number; gk?: string; scan?: Scan | null }>({ op: 'sync', since: cursor.get(), put: sending, me: s.me ?? '', wantKey: !s.geminiKey, app: __VERSION__ })
+    const res = await call<{ now: number; recs: Rec[]; v: number; gk?: string; scan?: Scan | null; found?: FoundTrip[] }>({ op: 'sync', since: cursor.get(), put: sending, me: s.me ?? '', wantKey: !s.geminiKey, app: __VERSION__ })
     outbox.set((o) => o.filter((r) => !sending.some((x) => x.coll === r.coll && x.id === r.id && x.at === r.at)))
     merge(res.recs ?? [])
     afterMerge(res.recs ?? [])
     cursor.set(res.now)
     if (res.gk && !settings.get().geminiKey) settings.set({ ...settings.get(), geminiKey: res.gk })
-    syncState.set({ ...syncState.get(), at: Date.now(), script: res.v, scan: res.scan ?? null, error: undefined })
+    syncState.set({ ...syncState.get(), at: Date.now(), script: res.v, scan: res.scan ?? null, found: Array.isArray(res.found) ? res.found : [], error: undefined })
     // A key saved before the script was connected: hand it over now (the script reads bookings with it).
     const k = settings.get()
     if (k.geminiKey && !k.keyShared) void shareKey(k.geminiKey)
@@ -84,6 +88,12 @@ export async function scanEmail(): Promise<void> {
   syncState.set({ ...syncState.get(), asked: Date.now() })
   setTimeout(() => void syncNow(), 75000)
   setTimeout(() => void syncNow(), 150000)
+}
+
+/** "Not this one": the script won't suggest this trip again. */
+export async function dismissFound(id: string) {
+  syncState.set({ ...syncState.get(), found: (syncState.get().found ?? []).filter((f) => f.id !== id) })
+  if (connected()) await call({ op: 'dismiss', id }).catch(() => {})
 }
 
 export function startSync() {

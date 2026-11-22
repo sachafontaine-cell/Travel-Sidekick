@@ -7,12 +7,12 @@
 //   sync       both phones send and fetch changes (newest change wins, per record)
 //   setKey     keeps the Gemini key so the other phone gets it automatically
 //   scan       every hour and on request, in the background: new booking emails + the KAYAK
-//              calendar become bookings in their trip, or a new trip (cleaned before Gemini)
+//              calendar become bookings in their trip; other trips are suggested, never added
 //   hourly     7:00 destination time: checks must-see hours with Google, emails if one is closed
 //              3 days before a trip: emails "download the language in Google Translate"
 //   nightly    updates this script from the repository when a newer version is published
 
-var VERSION = 3
+var VERSION = 4
 var REPO_RAW = 'https://raw.githubusercontent.com/sachafontaine-cell/Travel-Sidekick/main/script/'
 var APP_URL = 'https://sachafontaine-cell.github.io/Travel-Sidekick/'
 
@@ -59,6 +59,7 @@ function doPost(e) {
       return out({ ok: true })
     }
     if (body.op === 'scan') { requestScan(); return out({ ok: true }) }
+    if (body.op === 'dismiss') { dismiss(String(body.id || '')); return out({ ok: true }) }
     if (body.op === 'update') return out(selfUpdate())
     if (body.op === 'ping') return out({ v: VERSION })
     return out({ error: 'Unknown request' })
@@ -117,6 +118,7 @@ function sync(body) {
   var res = putRecords(body.put, body.since)
   res.v = VERSION
   res.scan = JSON.parse(PropertiesService.getScriptProperties().getProperty('SCAN') || 'null')
+  res.found = suggestions()
   if (body.wantKey) {
     var gk = PropertiesService.getScriptProperties().getProperty('GEMINI_KEY')
     if (gk) res.gk = gk
@@ -236,13 +238,38 @@ function findCity(name) {
   return loc ? { name: name, lat: loc.lat, lng: loc.lng, tz: 'UTC', country: '', currency: '', lang: '' } : null
 }
 
-function newTripRecord(g, now) {
-  var dest = findCity(g.destination)
-  if (!dest) return null
-  return {
-    id: Utilities.getUuid(), name: dest.name.split(',')[0], dest: dest, start: g.start, end: g.end, vibes: {}, budget: { all: 2 }, pace: 'balanced', people: [],
-    dayStart: 540, dayEnd: 1260, downtime: { on: true, minutes: 90 }, food: '', nos: [], home: 'USD', found: 'email', at: now, by: 'Email',
+/** Adds a found trip to the suggestions (with its bookings, located), unless already there or dismissed. */
+function suggest(g, found, dismissed) {
+  var key = g.destination.split(',')[0].trim().toLowerCase() + '|' + g.start
+  if (dismissed.indexOf(key) >= 0) return false
+  var same = found.filter(function (f) { return f.key === key })[0]
+  var dest = same ? same.dest : findCity(g.destination)
+  if (!dest) return false
+  var bookings = (g.bookings || []).filter(function (b) { return b && b.name && b.date }).slice(0, 20).map(function (b) {
+    var loc = geocode(b.address || b.name, dest.name)
+    return { name: String(b.name).slice(0, 60), kind: b.kind, date: b.date, time: b.time || '', lat: loc ? loc.lat : null, lng: loc ? loc.lng : null, note: String(b.note || '').slice(0, 80) }
+  })
+  if (same) {
+    bookings.forEach(function (b) { if (!same.bookings.some(function (x) { return x.name === b.name && x.date === b.date })) same.bookings.push(b) })
+    return false
   }
+  found.push({ id: Utilities.getUuid(), key: key, destination: g.destination, dest: dest, start: g.start, end: g.end, bookings: bookings })
+  return true
+}
+
+/** Suggestions still worth showing: not over, and not covered by a trip the family has made. */
+function suggestions() {
+  var today = Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd')
+  var trips = allRecords('trip')
+  return JSON.parse(PropertiesService.getScriptProperties().getProperty('FOUND') || '[]').filter(function (f) { return f.end >= today && !overlapping(trips, f.start, f.end) })
+}
+
+function dismiss(id) {
+  var props = PropertiesService.getScriptProperties()
+  var found = JSON.parse(props.getProperty('FOUND') || '[]')
+  var f = found.filter(function (x) { return x.id === id })[0]
+  if (f) props.setProperty('DISMISSED', JSON.stringify(JSON.parse(props.getProperty('DISMISSED') || '[]').concat([f.key]).slice(-100)))
+  props.setProperty('FOUND', JSON.stringify(found.filter(function (x) { return x.id !== id })))
 }
 
 function dayNumber(trip, date) {
@@ -267,8 +294,8 @@ function overlapping(trips, start, end) {
 }
 
 /**
- * Reads new booking emails and the KAYAK calendar, then adds each booking to its trip, or creates
- * the trip ("Found in your email") when none covers those dates. Runs every hour and on request,
+ * Reads new booking emails and the KAYAK calendar, then adds each booking to its trip. Trips the
+ * family hasn't made yet are only suggested (Trips screen: Add / Not this one). Runs every hour and on request,
  * in the background: the phones never wait for it; results arrive with the next sync.
  */
 function scan() {
@@ -289,16 +316,17 @@ function scan() {
       (events.length ? 'KAYAK calendar:\n' + JSON.stringify(events) + '\n\n' : '') + mail.texts.join('\n\n---\n\n')
     var groups = jsonIn(gemini(prompt))
     var places = allRecords('place')
+    var found = JSON.parse(props.getProperty('FOUND') || '[]')
+    var dismissed = JSON.parse(props.getProperty('DISMISSED') || '[]')
     var puts = {}, added = 0, newTrips = 0
     var put = function (coll, d) { puts[coll + ':' + d.id] = { coll: coll, id: d.id, at: d.at, data: d } }
     groups.forEach(function (g) {
       if (!g || !g.start || !g.end) return
       var trip = trips.filter(function (t) { return t.id === g.trip })[0] || overlapping(trips, g.start, g.end)
       if (!trip) {
-        if (g.end < today || !g.destination) return
-        trip = newTripRecord(g, now)
-        if (!trip) return
-        trips.push(trip); put('trip', trip); newTrips++
+        // A trip the family hasn't made yet: suggested on the Trips screen, never added by itself.
+        if (g.end >= today && g.destination && suggest(g, found, dismissed)) newTrips++
+        return
       }
       ;(g.bookings || []).forEach(function (b) {
         if (!b || !b.name || !b.date || b.date < addDays(trip.start, -1) || b.date > trip.end) return
@@ -317,6 +345,7 @@ function scan() {
     })
     var list = Object.keys(puts).map(function (k) { return puts[k] })
     if (list.length) putRecords(list, now)
+    props.setProperty('FOUND', JSON.stringify(found.slice(-10)))
     var seen = JSON.parse(props.getProperty('SEEN') || '[]').concat(mail.ids)
     props.setProperty('SEEN', JSON.stringify(seen.slice(-800)))
     props.setProperty('KAYAK_SEEN', JSON.stringify(kSeen.concat(events.map(function (e) { return e.summary + '|' + e.start })).slice(-400)))

@@ -1,5 +1,7 @@
 import { Crest, Icon } from '../ui'
 import { EmailCheck } from './email'
+import { connected, dismissFound, syncState } from '../lib/sync'
+import { addFound } from '../lib/found'
 import { trips, nowIn } from '../lib/data'
 import { DEMO } from '../lib/store'
 import { go, open, tripPath } from '../lib/nav'
@@ -19,6 +21,8 @@ export function Trips() {
   const now = all.filter((t) => where(t) === 'now')
   const soon = all.filter((t) => where(t) === 'upcoming')
   const past = all.filter((t) => where(t) === 'past').reverse()
+  const sync = syncState.use()
+  const found = connected() ? (sync.found ?? []) : []
   const openTrip = (t: Trip) => go(tripPath(t.id, !t.dest.name || !t.start ? 'setup' : t.built ? 'today' : 'setup'))
   const people = (t: Trip) => `${t.people.length} traveler${t.people.length === 1 ? '' : 's'}`
   return (
@@ -31,6 +35,17 @@ export function Trips() {
         </div>
       </div>
       <div class="list"><EmailCheck label="Trips and bookings from your email" /></div>
+      {found.map((f) => (
+        <div class="card card-pad stack">
+          <span class="chip ok" style={{ alignSelf: 'flex-start' }}>Found in your email</span>
+          <div class="between"><b class="h2">{f.dest.name.split(',')[0]}</b><span class="muted">{dateRange(f.start, f.end)}</span></div>
+          {f.bookings.length > 0 && <span class="muted small">{f.bookings.slice(0, 4).map((b) => b.name).join(' · ')}{f.bookings.length > 4 ? ` · +${f.bookings.length - 4}` : ''}</span>}
+          <div class="row">
+            <button class="btn btn-primary btn-sm grow press" onClick={() => { const t = addFound(f); void dismissFound(f.id); go(tripPath(t.id, 'setup')) }}>Add this trip</button>
+            <button class="btn btn-quiet btn-sm press" onClick={() => void dismissFound(f.id)}>Not this one</button>
+          </div>
+        </div>
+      ))}
       {DEMO && <div class="banner"><span class="dot" /><span class="grow small">Sample trip. Nothing here touches your own trips.</span><a class="link small" href={location.pathname}>Leave</a></div>}
 
       {now.length > 0 && <span class="label">Happening now</span>}

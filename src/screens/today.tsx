@@ -15,6 +15,7 @@ import { tripDays } from '../lib/planner'
 import { langName } from '../lib/money'
 import type { Energy, Trip } from '../lib/model'
 import { Photos } from './card'
+import { TripBar } from './tripbar'
 
 export const translateUrl = (t: Trip) => `https://translate.google.com/?sl=${t.dest.lang}&tl=en&op=translate`
 
@@ -73,6 +74,7 @@ export function Today({ trip }: { trip: Trip }) {
     const inDays = daysBetween(now.date, trip.start)
     return (
       <main class="main">
+        <TripBar />
         {header(`${trip.name} in ${inDays} day${inDays === 1 ? '' : 's'}`, shortDate(trip.start))}
         <MustLine trip={trip} today={0} now={now.min} />
         <BeforeYouGo trip={trip} />
@@ -83,6 +85,7 @@ export function Today({ trip }: { trip: Trip }) {
   if (now.day > n) {
     return (
       <main class="main">
+        <TripBar />
         {header('Trip over', trip.name)}
         <p class="muted">Welcome home. The plan stays here if you want to look back.</p>
         <button class="btn btn-secondary press" onClick={() => go('#/', true)}>All trips</button>
@@ -103,6 +106,7 @@ export function Today({ trip }: { trip: Trip }) {
 
   return (
     <main class="main">
+      <TripBar />
       {header('Today', `${trip.name} · Day ${now.day} of ${n}`)}
 
       {asked.slice(-1).map((x) => (

@@ -18,7 +18,7 @@ No family data lives in this public repository. Trips stay on your phones and in
 - **Trip**: Google Translate ↗, KAYAK ↗, Google Maps ↗, local rules, trip setup.
 - **Trip setup**: six rows (where & when, who's coming, vibe, budget, day shape, food & hard nos). Suggestions in parentheses; "Custom" when changed.
 - **First run**: builds ~30 places with Gemini (about 20 s, once), plans the days, then you confirm the must-sees.
-- **Bookings and trips from your email** (and your KAYAK calendar link, optional): the family script reads new booking emails every hour, in the background. A booking during a trip joins it at its booked time; bookings for new dates create the trip ("Found in your email"; it gets your family, currency and language by itself). Nothing in the app ever waits for email. Trips and the Trip tab show when it last checked, with **Check now**.
+- **Bookings and trips from your email** (and your KAYAK calendar link, optional): the family script reads new booking emails every hour, in the background. A booking during a trip joins it at its booked time. Bookings for other dates are only suggested on the Trips screen ("Found in your email": **Add this trip** / **Not this one**); an added trip gets your family, currency, language and hotel by itself. Nothing in the app ever waits for email. Trips and the Trip tab show when it last checked, with **Check now**.
 - **Photos**: each place's official photo from Wikipedia/Wikidata, only when the article is clearly about that place (name and location). Restaurants usually have none: use **Photos on Google Maps ↗** on the card.
 
 Coming in 1.1: Snap (menus, receipts and bill check). Later: stories on a place's card.
@@ -54,7 +54,7 @@ Without it the app works on one phone, with no emails.
 | Picked / Maybe / Eliminated, order, adding a place | Plan → All |
 | Order and timing in a day, where downtime goes | Plan → that day |
 | Must-see or not, time there, which day, done | The place's card |
-| Gemini key, who this phone is, email alerts | Trips → ⚙ This app |
+| Gemini key, who this phone is, email alerts, the family link (copy/share) | ⚙ (top right of every screen) |
 | Bookings | Gmail (read every hour) and the KAYAK calendar link (⚙ This app) |
 
 ## How it stays fast

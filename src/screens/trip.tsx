@@ -1,6 +1,7 @@
 // The Trip tab: links out (Google Translate, KAYAK), local rules, setup. Snap arrives in 1.1.
 import { Icon } from '../ui'
 import { EmailCheck } from './email'
+import { TripBar } from './tripbar'
 import { nowIn, trips } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
 import { langName } from '../lib/money'
@@ -15,7 +16,8 @@ export function TripTab({ trip }: { trip: Trip }) {
   )
   return (
     <main class="main">
-      <div class="between"><h1 class="h1">{t.name} trip</h1><button class="link press" onClick={() => go('#/')}>All trips</button></div>
+      <TripBar />
+      <h1 class="h1">{t.name} trip</h1>
       <div class="list">
         {t.dest.lang !== 'en' && out(translateUrl(t), 'Google Translate', `Talk, signs and menus in ${langName(t.dest.lang)}`)}
         {out('https://www.kayak.com/trips', 'KAYAK Trips', 'Flights, hotels, bookings and documents')}

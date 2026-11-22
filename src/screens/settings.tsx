@@ -93,6 +93,28 @@ function Family() {
     <div class="stack">
       <div class="row"><span class={`chip ${st.error ? 'amber' : 'ok'}`}>{st.error ? 'Sync problem' : 'Connected'}</span><span class="muted small">{st.error ? st.error : ago == null ? 'Not synced yet' : ago < 1 ? 'Synced just now' : `Synced ${ago} min ago`}{st.script ? ` · script v${st.script}` : ''}</span></div>
       <button class="btn btn-quiet btn-sm press" onClick={() => void syncNow()}>Sync now</button>
+      <FamilyLink />
+    </div>
+  )
+}
+
+/** The family link, to open once on the other phone. It holds the family key: keep it private. */
+function FamilyLink() {
+  const [shown, setShown] = useState(false)
+  const [msg, setMsg] = useState('')
+  const link = `${location.origin}${import.meta.env.BASE_URL}?k=${encodeURIComponent(familyKey())}&api=${settings.get().api ?? ''}`
+  const copy = async () => { try { await navigator.clipboard.writeText(link); setMsg('Copied.') } catch { setShown(true); setMsg('Copy blocked: select the link below.') } }
+  const share = async () => { try { await navigator.share({ title: 'Travel Sidekick family link', text: 'Open once on your phone (keep it private):', url: link }) } catch { /* closed */ } }
+  return (
+    <div class="stack">
+      <span class="muted small">Family link: open it once on the other phone. It holds the family key, so keep it private.</span>
+      <div class="row">
+        <button class="btn btn-quiet btn-sm grow press" onClick={copy}>Copy link</button>
+        {'share' in navigator && <button class="btn btn-quiet btn-sm grow press" onClick={share}>Share</button>}
+        <button class="btn btn-quiet btn-sm press" onClick={() => setShown(!shown)}>{shown ? 'Hide' : 'Show'}</button>
+      </div>
+      {shown && <span class="linkbox">{link}</span>}
+      {msg && <span class="muted small">{msg}</span>}
     </div>
   )
 }
@@ -151,6 +173,7 @@ export function AppSheet() {
       <div class="stack"><span class="label">Family script (sync, emails)</span><Family /></div>
       <div class="stack"><span class="label">Email alerts</span><Alerts /></div>
       <div class="stack"><span class="label">KAYAK calendar (optional)</span><Kayak /></div>
+      <a class="link press" style={{ alignSelf: 'center' }} href="https://github.com/sachafontaine-cell/Travel-Sidekick#one-time-setup" target="_blank" rel="noopener">Setup guide<Icon.out /></a>
       <Version />
     </Sheet>
   )

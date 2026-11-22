@@ -66,7 +66,7 @@ describe('family script', () => {
     w.tick()
     const c = w.post({ k: 'family-key-123', op: 'sync', since: a.now, put: [{ coll: 'place', id: 'p2', at: 200, data: { id: 'p2' } }] })
     expect(c.recs.map((r: any) => r.id)).toEqual(['p2'])
-    expect(c.v).toBe(3)
+    expect(c.v).toBe(4)
   })
 
   it('shares the Gemini key with the other phone', () => {
@@ -104,20 +104,20 @@ describe('family script', () => {
     const calls: string[] = []
     w = world((url, opts) => {
       calls.push(`${(opts.method ?? 'get').toUpperCase()} ${url.replace(/^https:\/\/[^/]+/, '')}`)
-      if (url.endsWith('version.json')) return { code: 200, body: '{"version":4}' }
-      if (url.endsWith('Code.gs')) return { code: 200, body: 'var VERSION = 4\n' }
+      if (url.endsWith('version.json')) return { code: 200, body: '{"version":5}' }
+      if (url.endsWith('Code.gs')) return { code: 200, body: 'var VERSION = 5\n' }
       if (url.endsWith('appsscript.json')) return { code: 200, body: '{}' }
       if (url.endsWith('/deployments') && !opts.method?.match(/put/)) return { code: 200, body: JSON.stringify({ deployments: [{ deploymentId: 'HEAD', deploymentConfig: {} }, { deploymentId: 'web1', deploymentConfig: { versionNumber: 1 }, entryPoints: [{ entryPointType: 'WEB_APP' }] }] }) }
       if (url.endsWith('/versions')) return { code: 200, body: '{"versionNumber":7}' }
       return { code: 200, body: '{}' }
     })
-    expect(w.post({ k: 'family-key-123', op: 'update' })).toEqual({ ok: true, v: 4 })
+    expect(w.post({ k: 'family-key-123', op: 'update' })).toEqual({ ok: true, v: 5 })
     expect(calls).toContain('PUT /v1/projects/script1/content')
     expect(calls).toContain('PUT /v1/projects/script1/deployments/web1')
     expect(w.props.DEPLOYMENT_ID).toBe('web1')
   })
 
-  it('reads booking emails in the background: bookings join their trip, new dates make a new trip, each email once', () => {
+  it('reads booking emails in the background: bookings join their trip, new dates are only suggested, each email once', () => {
     let geminiCalls = 0
     let prompt = ''
     w = world((url, opts) => {
@@ -154,10 +154,15 @@ describe('family script', () => {
     const cabo = trips.find((t: any) => t.id === 'cabo')
     expect(cabo.base).toMatchObject({ name: 'Hotel Riu Santa Fe', lat: 48.86 })
     expect(places.find((p: any) => p.name === 'Whale watching tour')).toMatchObject({ trip: 'cabo', day: 3, fixed: 570, booked: 'Booked · from your email' })
-    const rome = trips.find((t: any) => t.name === 'Rome')
-    expect(rome).toMatchObject({ found: 'email', start: '2027-03-10', dest: { tz: 'Europe/Rome', country: 'IT' } })
-    expect(places.find((p: any) => p.name === 'Flight to Rome')).toMatchObject({ trip: rome.id, day: 1, fixed: 18 * 60 + 5 })
-    expect(res.scan).toMatchObject({ added: 2, trips: 1 })
+    // Rome is not added: it's suggested, with its bookings located, until Add or Not this one.
+    expect(trips.find((t: any) => t.name === 'Rome')).toBeUndefined()
+    expect(places.find((p: any) => p.name === 'Flight to Rome')).toBeUndefined()
+    expect(res.found).toHaveLength(1)
+    expect(res.found[0]).toMatchObject({ destination: 'Rome, Italy', start: '2027-03-10', dest: { tz: 'Europe/Rome', country: 'IT' } })
+    expect(res.found[0].bookings[0]).toMatchObject({ name: 'Flight to Rome', time: '18:05', lat: 48.86 })
+    expect(res.scan).toMatchObject({ added: 1, trips: 1 })
+    w.post({ k: 'family-key-123', op: 'dismiss', id: res.found[0].id })
+    expect(w.post({ k: 'family-key-123', op: 'sync', since: 0, put: [] }).found).toEqual([])
     // Next hour: the same emails aren't read again.
     w.tick()
     w.ctx.scan()

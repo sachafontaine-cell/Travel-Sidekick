@@ -14,6 +14,7 @@ import { price } from '../lib/money'
 import { km } from '../lib/geo'
 import { byRank } from '../lib/rank'
 import { filters, type Filters } from './sheets'
+import { TripBar } from './tripbar'
 import type { Place, Status, Trip } from '../lib/model'
 
 export function Plan({ trip, day }: { trip: Trip; day: number }) {
@@ -22,6 +23,7 @@ export function Plan({ trip, day }: { trip: Trip; day: number }) {
   const now = nowIn(trip)
   return (
     <main class="main">
+      <TripBar />
       <h1 class="h1">Plan</h1>
       <div class="strip" role="tablist" aria-label="Days">
         <button role="tab" aria-selected={day === 0} class={`pill press${day === 0 ? ' on' : ''}`} onClick={() => go(tripPath(trip.id, 'plan'), true)}>All</button>

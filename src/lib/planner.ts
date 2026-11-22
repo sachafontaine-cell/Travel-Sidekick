@@ -96,7 +96,7 @@ export function planDay(trip: Trip, day: number, all: Place[], meta?: DayMeta): 
   }
   const addLunch = () => {
     const start = Math.max(cursor, 12 * 60)
-    slots.push({ kind: 'lunch', id: 'lunch', start, end: start + LUNCH_MIN, travel: { minutes: 0, walkKm: 0, mode: 'walk' }, wait: start - cursor || undefined })
+    slots.push({ kind: 'lunch', id: 'lunch', start, end: start + LUNCH_MIN, travel: { minutes: 0, walkKm: 0, mode: 'walk', km: 0 }, wait: start - cursor || undefined })
     cursor = start + LUNCH_MIN
     lunchDone = true
     maybeDowntime('lunch')
@@ -111,7 +111,7 @@ export function planDay(trip: Trip, day: number, all: Place[], meta?: DayMeta): 
     // No meal coming and it's lunchtime: keep a lunch break before going on.
     if (!lunchDone && p.kind !== 'meal' && cursor >= 12 * 60 + 15 && cursor < LUNCH[1]) addLunch()
     const away = far(p)
-    const travel = away ? { minutes: 0, walkKm: 0, mode: 'walk' as const } : leg(pos, p, kids)
+    const travel = away ? { minutes: 0, walkKm: 0, mode: 'walk' as const, km: 0 } : leg(pos, p, kids)
     const arrive = cursor + travel.minutes
     let start = arrive
     let warn: string | undefined

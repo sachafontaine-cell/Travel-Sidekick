@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact'
-import { useEffect } from 'preact/hooks'
+import { useEffect, useLayoutEffect } from 'preact/hooks'
 import { close } from './lib/nav'
 import { lastChange, undo } from './lib/data'
 import { CREST_PATH, CREST_VIEWBOX } from './lib/crest'
@@ -34,6 +34,7 @@ export const Icon = {
   train: () => svg(<><rect x="6" y="3" width="12" height="13" rx="3" /><path d="M6 10h12M9 19l-2 2M15 19l2 2M9 13h.01M15 13h.01" /></>),
   rest: () => svg(<><path d="M3 18v-6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v6M3 15h18M6 9V6" /></>),
   photo: () => svg(<><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.8" /><path d="M21 16l-5-5-8 8" /></>),
+  car: () => svg(<><path d="M5 16V11l2-5h10l2 5v5" /><path d="M3 16h18v3H3z" /><circle cx="7.5" cy="19" r="1.5" /><circle cx="16.5" cy="19" r="1.5" /><path d="M5 11h14" /></>),
   cloud: () => svg(<><path d="M7 17a4 4 0 1 1 1-7.9A5 5 0 0 1 17.5 10a3.5 3.5 0 0 1-.5 7z" /><path d="M9 20l-1 1.5M13 20l-1 1.5M17 20l-1 1.5" /></>),
 }
 
@@ -42,7 +43,8 @@ export function Crest({ size = 34 }: { size?: number }) {
 }
 
 function useEscape(onClose: () => void) {
-  useEffect(() => {
+  // Layout effect: listening from the moment the sheet is on screen (a quick Escape isn't lost).
+  useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)

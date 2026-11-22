@@ -259,3 +259,8 @@ textarea.field { height: auto; padding: 10px 12px; resize: vertical; line-height
 .timerow { display: flex; align-items: center; gap: 10px; }
 .timefield { width: 160px; flex-shrink: 0; padding: 0 8px; min-height: 48px; font-size: 17px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
 .timefield.custom { border-color: var(--gold); border-width: 2px; }
+.fromhotel { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); }
+.modes { display: flex; gap: 6px; }
+.mode { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 34px; border-radius: 10px; font-size: 14px; color: var(--muted); background: var(--tile); font-variant-numeric: tabular-nums; }
+.mode svg { width: 17px; height: 17px; }
+.mode.on { background: var(--primary); color: var(--on-primary); font-weight: 600; }

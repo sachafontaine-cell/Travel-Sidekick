@@ -12,7 +12,7 @@ mkdirSync(SHOTS, { recursive: true })
 const results = []
 async function test(name, fn) {
   const t0 = Date.now()
-  try { await fn(); results.push(['PASS', name, Date.now() - t0]) } catch (e) { results.push(['FAIL', name, e.message.split('\n')[0]]) }
+  try { await fn(); results.push(['PASS', name, Date.now() - t0]) } catch (e) { if (process.env.STACK) console.log(e.stack); results.push(['FAIL', name, e.message.split('\n')[0]]) }
 }
 const expect = (ok, msg) => { if (!ok) throw new Error(msg) }
 
@@ -31,6 +31,8 @@ async function page(opts = {}) {
   return p
 }
 const text = (p) => p.evaluate(() => document.body.innerText)
+// The app writes to storage when idle (within 0.5 s): wait for that before reading it.
+const storedPlaces = async (p) => { await p.waitForTimeout(700); return p.evaluate(() => Object.values(JSON.parse(localStorage.getItem('ts:places') || '{}'))) }
 
 // ---------- Sample trip ----------
 
@@ -290,7 +292,7 @@ await test('new trip: setup, key, build the list (streamed), confirm must-sees, 
   await p.getByRole('checkbox', { name: /Louvre/ }).uncheck()
   await p.getByRole('button', { name: 'Looks good' }).click()
   await p.getByText(/^Activities/).first().waitFor()
-  const saved = await p.evaluate(() => Object.values(JSON.parse(localStorage.getItem('ts:places') || '{}')))
+  const saved = await storedPlaces(p)
   const orsay = saved.find((x) => x.name === "Musée d'Orsay")
   expect(orsay.day && orsay.day !== 4, `Orsay planned, not on Monday (Day ${orsay.day})`)
   expect(saved.find((x) => x.name === 'Louvre').must === false, 'unticked must-see is an ordinary pick')
@@ -302,7 +304,7 @@ await test('new trip: setup, key, build the list (streamed), confirm must-sees, 
   await p.keyboard.press('Escape')
   await p.getByRole('button', { name: 'See the plan' }).click()
   await p.getByText(/Suggestions updated · 1 new/).waitFor({ timeout: 10000 })
-  const after = await p.evaluate(() => Object.values(JSON.parse(localStorage.getItem('ts:places') || '{}')))
+  const after = await storedPlaces(p)
   const lux0 = saved.find((x) => x.name === 'Luxembourg Gardens'), lux = after.find((x) => x.name === 'Luxembourg Gardens')
   expect(lux.worth < lux0.worth && lux.status === lux0.status && lux.day === lux0.day, `re-scored, choices kept (${lux0.worth} → ${lux.worth})`)
   expect(after.find((x) => x.name === "Musée d'Orsay").day === orsay.day, 'days kept')

@@ -15,6 +15,7 @@ import { tripDays } from '../lib/planner'
 import { langName } from '../lib/money'
 import type { Energy, Trip } from '../lib/model'
 import { Photos } from './card'
+import { legText } from '../lib/geo'
 import { TripBar } from './tripbar'
 
 export const translateUrl = (t: Trip) => `https://translate.google.com/?sl=${t.dest.lang}&tl=en&op=translate`
@@ -123,7 +124,7 @@ export function Today({ trip }: { trip: Trip }) {
           <span class="label">{next.start <= now.min ? 'Now' : 'Next up'} · {clock(next.start)}</span>
           <span class="h2">{next.place?.name ?? (next.kind === 'downtime' ? 'Downtime' : 'Lunch')}</span>
           {leaveBy != null && (
-            <span class="leave"><b>Leave by {clock(leaveBy)}</b><span class="muted small">{next.travel.minutes} min {next.travel.mode === 'metro' ? 'metro' : 'walk'} + {kidBuffer(trip)} min kid buffer</span></span>
+            <span class="leave"><b>Leave by {clock(leaveBy)}</b><span class="muted small">{legText(next.travel)} + {kidBuffer(trip)} min kid buffer</span></span>
           )}
         </button>
       ) : (
@@ -137,7 +138,7 @@ export function Today({ trip }: { trip: Trip }) {
             <Photos p={idea.place} size="thumb" />
             <span class="grow stack" style={{ gap: '4px' }}>
               <span class="between"><b>{idea.place.name}</b><b>{idea.place.worth}/10</b></span>
-              <span class="muted small">{idea.travel.minutes} min {idea.travel.mode === 'metro' ? 'metro' : 'walk'} · {short(trip, idea.place.price)} · {idea.minutes} min · {idea.place.why}</span>
+              <span class="muted small">{legText(idea.travel)} · {short(trip, idea.place.price)} · {idea.minutes} min · {idea.place.why}</span>
             </span>
           </button>
           <div class="row">

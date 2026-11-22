@@ -1,8 +1,10 @@
-// Distances and travel times, estimated instantly on the phone. Straight-line distance times a
-// street factor; walking speed drops with young kids. Far hops are by metro/RER.
+// Distances and travel times, estimated instantly on the phone (no paid map service).
+// Walk, public transit or car (yours, a taxi or a ride app): whichever is fastest, except that
+// walking wins when it's only a little longer (5 min, or a quarter of the trip, whichever is more).
 
 export interface Point { lat: number; lng: number }
-export interface Leg { minutes: number; walkKm: number; mode: 'walk' | 'metro' }
+export type Mode = 'walk' | 'transit' | 'car'
+export interface Leg { minutes: number; walkKm: number; mode: Mode; km: number }
 
 export const KM_PER_MI = 1.609344
 
@@ -14,16 +16,32 @@ export function km(a: Point, b: Point): number {
 }
 
 const STREET = 1.3
-/** Above this walking distance, take public transport. */
-export const WALK_MAX_KM = 2.2
+
+/** Minutes each way would take: walk, transit (walk to and from stops, a wait, the ride), car. */
+export function options(a: Point, b: Point, youngKids: boolean): Record<Mode, number> {
+  const d = km(a, b), road = d * STREET
+  const walk = (road / (youngKids ? 3.6 : 4.6)) * 60
+  const transit = d < 1 ? Infinity : 15 + (d / 22) * 60
+  const car = 8 + (road / (road > 15 ? 55 : 28)) * 60 // getting the car or a ride, then city or highway speed
+  return { walk, transit, car }
+}
+
+/** "Just a little longer": up to 5 min, or a quarter of the fastest way, more than the fastest. */
+export const walkSlack = (fastest: number) => Math.max(5, fastest * 0.25)
 
 export function leg(a: Point | undefined, b: Point | undefined, youngKids: boolean): Leg {
-  if (!a || !b) return { minutes: 0, walkKm: 0, mode: 'walk' }
-  const walk = km(a, b) * STREET
-  const speed = youngKids ? 3.6 : 4.6 // km/h
-  if (walk <= WALK_MAX_KM) return { minutes: Math.max(1, Math.round((walk / speed) * 60)), walkKm: walk, mode: 'walk' }
-  // Metro/RER: walk to and from stations, a wait, then the ride (~25 km/h door to door).
-  return { minutes: Math.round(10 + 5 + (km(a, b) / 25) * 60), walkKm: 0.6, mode: 'metro' }
+  if (!a || !b) return { minutes: 0, walkKm: 0, mode: 'walk', km: 0 }
+  const o = options(a, b, youngKids)
+  const d = km(a, b)
+  const best = Math.min(o.transit, o.car)
+  if (o.walk <= best + walkSlack(best)) return { minutes: Math.max(1, Math.round(o.walk)), walkKm: d * STREET, mode: 'walk', km: d }
+  return o.transit <= o.car
+    ? { minutes: Math.round(o.transit), walkKm: 0.6, mode: 'transit', km: d }
+    : { minutes: Math.round(o.car), walkKm: 0.1, mode: 'car', km: d }
 }
+
+export const MODE_NAME: Record<Mode, string> = { walk: 'walk', transit: 'transit', car: 'by car' }
+/** "12 min walk", "25 min by car". */
+export const legText = (l: Pick<Leg, 'minutes' | 'mode'>) => `${l.minutes} min ${MODE_NAME[l.mode]}`
 
 export const miles = (km: number) => km / KM_PER_MI

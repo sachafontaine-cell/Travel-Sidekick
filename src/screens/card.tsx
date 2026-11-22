@@ -11,6 +11,8 @@ import { dateOf, hoursOn } from '../lib/planner'
 import { clock, duration, pad, parseClock } from '../lib/time'
 import { price } from '../lib/money'
 import type { Place, Trip } from '../lib/model'
+import { leg, legText, options, type Mode } from '../lib/geo'
+import { youngKids } from '../lib/people'
 import { photoFor } from '../lib/background'
 
 /** Google Maps photos, as a square tile where a photo would be (or after the photos). */
@@ -26,6 +28,23 @@ export function Photos({ p, size = 'big', maps }: { p: Place; size?: 'big' | 'th
     <div class={`photos${urls.length === 1 ? ' one' : ''}`}>
       {urls.map((u) => <img src={u} alt={`${p.name}`} loading="lazy" decoding="async" referrerpolicy="no-referrer" onLoad={(e) => (e.currentTarget as HTMLImageElement).classList.add('in')} />)}
       {maps && <MapsTile href={maps} />}
+    </div>
+  )
+}
+
+/** From the hotel: all three ways, the one we'd take in bold, and a Directions link. */
+function FromHotel({ trip, p }: { trip: Trip; p: Place }) {
+  const base = trip.base!
+  const kids = youngKids(trip)
+  const best = leg(base, p, kids)
+  const o = options(base, p, kids)
+  const d = best.km * 1.3
+  const I = { walk: Icon.walk, transit: Icon.train, car: Icon.car }
+  const dir = `https://www.google.com/maps/dir/?api=1&origin=${base.lat},${base.lng}&destination=${encodeURIComponent(`${p.name}, ${trip.dest.name}`)}&travelmode=${best.mode === 'car' ? 'driving' : best.mode === 'transit' ? 'transit' : 'walking'}`
+  return (
+    <div class="fromhotel">
+      <div class="between"><span class="small"><b>{legText(best)}</b> from {base.name.split(',')[0]} · {d < 10 ? d.toFixed(1) : Math.round(d)} km</span><a class="link small press" href={dir} target="_blank" rel="noopener">Directions<Icon.out /></a></div>
+      <div class="modes">{(['walk', 'transit', 'car'] as Mode[]).filter((m) => isFinite(o[m])).map((m) => { const M = I[m]; return <span class={`mode${m === best.mode ? ' on' : ''}`}><M />{Math.round(o[m])} min</span> })}</div>
     </div>
   )
 }
@@ -80,6 +99,8 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
       )}
       {!ticket && p.recText && <p><b>{p.rec === 'pay' && p.price === 0 ? 'Go for it' : REC[p.rec]}.</b> {cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?)[:.,;]?\s*/i, ''))}</p>}
       {p.desc ? <p class="desc">{p.desc}</p> : !p.scoring && !p.booked && settings.get().geminiKey ? <p class="muted small">Getting a description…</p> : null}
+
+      {!ticket && trip.base && <FromHotel trip={trip} p={p} />}
 
       {/* Where it stands: one tap, always visible. Must-sees can't be skipped. */}
       {!ticket && <div class="seg" role="group" aria-label="In the plan">

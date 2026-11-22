@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'preact/hooks'
 import { createStore } from '../lib/store'
 import { BadgeChip, Icon, Spinner, StateChip } from '../ui'
 import { refreshList, refreshing, stale } from '../lib/refresh'
+import { youngKids } from '../lib/people'
 import { days, nowIn, places, plansFor, save, tripPlaces, trips } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
 import { moveInDay, moveInList, pushDown, setDay, setStatus } from '../lib/actions'
@@ -13,7 +14,7 @@ import { planChecked, planPending, rebalance } from '../lib/rebalance'
 import { dateOf, tripDays, type Slot } from '../lib/planner'
 import { clock, shortDate, WEEKDAY, weekday } from '../lib/time'
 import { price } from '../lib/money'
-import { km } from '../lib/geo'
+import { km, leg, legText } from '../lib/geo'
 import { byRank } from '../lib/rank'
 import { groupOf, type Group } from '../lib/groups'
 import { filters, type Filters } from './sheets'
@@ -194,7 +195,7 @@ function Row({ trip, p, draggable, onGrip }: { trip: Trip; p: Place; draggable: 
       <Tick p={p} />
       <button class="open press" onClick={() => open({ kind: 'card', place: p.id })}>
         <span class="name">{p.name}</span>
-        <span class="meta">{p.fresh && <span class="chip ok">New</span>}<BadgeChip p={p} />{p.scoring ? <span>Scoring…</span> : <span>Worth {p.worth} · {price(trip, p.price, false)}</span>}{p.day ? <span class="chip plain">Day {p.day}</span> : p.status === 'picked' && unfitIds.get().includes(p.id) ? <span class="chip amber">Doesn't fit</span> : null}{p.done && <span class="chip plain">Done</span>}</span>
+        <span class="meta">{p.fresh && <span class="chip ok">New</span>}<BadgeChip p={p} />{p.scoring ? <span>Scoring…</span> : <span>Worth {p.worth} · {price(trip, p.price, false)}{trip.base && !p.booked ? ` · ${legText(leg(trip.base, p, youngKids(trip)))}` : ''}</span>}{p.day ? <span class="chip plain">Day {p.day}</span> : p.status === 'picked' && unfitIds.get().includes(p.id) ? <span class="chip amber">Doesn't fit</span> : null}{p.done && <span class="chip plain">Done</span>}</span>
       </button>
       {draggable && <span class="handle" role="button" aria-label={`Drag to reorder ${p.name}`} onPointerDown={(e) => onGrip(e as unknown as PointerEvent)}><Icon.grip /></span>}
     </div>
@@ -247,7 +248,7 @@ function Day({ trip, day }: { trip: Trip; day: number }) {
 
 function SlotRow({ trip, s, first, past, onGrip }: { trip: Trip; s: Slot; first: boolean; past: boolean; onGrip: (e: PointerEvent) => void }) {
   const sw = swipeable(s.place ? () => setDay(s.id, null) : undefined)
-  const travel = !first && s.travel.minutes > 0 ? `${s.travel.minutes} min ${s.travel.mode === 'metro' ? 'metro' : 'walk'}` : ''
+  const travel = !first && s.travel.minutes > 0 ? legText(s.travel) : ''
   const name = s.place?.name ?? (s.kind === 'downtime' ? `Downtime · ${s.end - s.start} min` : 'Lunch (pick a spot nearby)')
   const sub = s.warn ?? (s.place?.booked ?? (s.kind === 'downtime' ? (trip.base ? `At ${trip.base.name}` : 'Rest nearby') : s.place ? `Worth ${s.place.worth}${s.wait && s.wait >= 15 ? ` · ${s.wait} min free before` : ''}` : ''))
   return (

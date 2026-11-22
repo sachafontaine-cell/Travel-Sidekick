@@ -6,9 +6,9 @@ import { nowIn, places, plansFor, save, settings } from '../lib/data'
 import { describePlace, groupKey } from '../lib/ai'
 import { hasKids, weights } from '../lib/score'
 import { close, open, replaceTop } from '../lib/nav'
-import { setDone, setMinutes, setMust, setStatus } from '../lib/actions'
+import { setDone, setMinutes, setMust, setStatus, setTime } from '../lib/actions'
 import { dateOf, hoursOn } from '../lib/planner'
-import { clock, duration } from '../lib/time'
+import { clock, duration, pad, parseClock } from '../lib/time'
 import { price } from '../lib/money'
 import type { Place, Trip } from '../lib/model'
 import { photoFor } from '../lib/background'
@@ -33,6 +33,7 @@ export function Photos({ p, size = 'big', maps }: { p: Place; size?: 'big' | 'th
 const tried = new Set<string>()
 const described = new Set<string>()
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+const hhmm = (m: number) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`
 const REC = { pay: 'Pay for it', cheaper: 'Do the cheaper version', skip: 'Skip it' }
 
 export function Card({ trip, id }: { trip: Trip; id: string }) {
@@ -54,6 +55,8 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
   const slot = day ? plansFor(trip)[day - 1]?.slots.find((s) => s.id === p.id) : undefined
   const group = p.price * Math.max(1, trip.people.length)
   const checked = p.hours?.source === 'google' && p.hours.checkedAt ? new Date(p.hours.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : null
+  // Flights and other bookings that aren't activities: no score, price, photos or opening hours.
+  const ticket = !!p.booked && p.kind === 'other'
   const maps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.name}, ${trip.dest.name}`)}`
   return (
     <Dialog label={p.name}>
@@ -63,43 +66,51 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
         </button>
         <div class="row"><BadgeFull p={p} /><button class="iconbtn ring press" aria-label="Close" onClick={close}><Icon.x /></button></div>
       </div>
-      <Photos p={p} maps={maps} />
+      {!ticket && <Photos p={p} maps={maps} />}
       <h2 class="h2">{p.name}</h2>
+      {ticket && <p class="muted">{p.booked}{p.why ? ` · ${p.why}` : ''}</p>}
 
-      {p.scoring ? <p class="muted">Scoring… a few seconds.</p> : (
+      {ticket ? null : p.scoring ? <p class="muted">Scoring… a few seconds.</p> : (
         <div class="between" style={{ alignItems: 'flex-start' }}>
           <div class="stat"><span class="muted small">Worth it</span><span class="big num">{p.worth}<small>/10</small></span></div>
           <div class="stat" style={{ textAlign: 'right' }}><span class="muted small">Price</span><span class="big num" style={{ fontSize: '20px' }}>{price(trip, p.price)}</span>{p.price > 0 && <span class="muted small">{price(trip, group, false)} for {trip.people.length}</span>}</div>
         </div>
       )}
-      {p.recText && <p><b>{p.rec === 'pay' && p.price === 0 ? 'Go for it' : REC[p.rec]}.</b> {cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?)[:.,;]?\s*/i, ''))}</p>}
+      {!ticket && p.recText && <p><b>{p.rec === 'pay' && p.price === 0 ? 'Go for it' : REC[p.rec]}.</b> {cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?)[:.,;]?\s*/i, ''))}</p>}
       {p.desc ? <p class="desc">{p.desc}</p> : !p.scoring && !p.booked && settings.get().geminiKey ? <p class="muted small">Getting a description…</p> : null}
 
       {/* Where it stands: one tap, always visible. Must-sees can't be skipped. */}
-      <div class="seg" role="group" aria-label="In the plan">
+      {!ticket && <div class="seg" role="group" aria-label="In the plan">
         {(['picked', 'maybe', 'out'] as const).map((s) => s === 'out' && p.must ? null : (
           <button class={p.status === s ? 'on press' : 'press'} aria-pressed={p.status === s} onClick={() => setStatus(p.id, s)}>{s === 'picked' ? 'Want it' : s === 'maybe' ? 'Maybe' : 'Skip'}</button>
         ))}
-      </div>
+      </div>}
       {p.status !== 'out' && (
         <div class="row">
-          <button class="btn btn-primary grow press" onClick={() => open({ kind: 'sheet', name: 'day', arg: p.id })}>{day ? `Day ${day}${slot ? ` · ${clock(slot.start)}` : ''}` : 'Add to a day'} <Icon.down /></button>
+          <button class="btn btn-primary grow press" onClick={() => open({ kind: 'sheet', name: 'day', arg: p.id })}>{day ? `Day ${day}` : 'Add to a day'} <Icon.down /></button>
           {day != null && <button class={`btn btn-sm press ${p.done ? 'btn-primary' : 'btn-quiet'}`} aria-pressed={!!p.done} onClick={() => setDone(p.id, !p.done)}><Icon.check />Done</button>}
         </div>
       )}
+      {p.status !== 'out' && day != null && (slot || p.fixed != null) && (
+        <div class="timerow">
+          <label class="grow" for={`t-${p.id}`}><span class="strong">Start time</span><br /><span class="muted small">{p.fixed != null ? (p.booked ? 'Booked time' : 'Set by you') : 'Set by the planner'}</span></label>
+          <input id={`t-${p.id}`} class={`field timefield${p.fixed != null ? ' custom' : ''}`} type="time" step={300} value={hhmm(p.fixed ?? slot!.start)} onChange={(e) => { const v = parseClock((e.target as HTMLInputElement).value); if (v != null) setTime(trip, p.id, v) }} />
+          {p.fixed != null && !p.booked && <button class="btn btn-quiet btn-sm press" onClick={() => setTime(trip, p.id, null)}>Auto</button>}
+        </div>
+      )}
 
-      <div class="banner" style={{ padding: '6px 6px 6px 14px' }}>
+      {!ticket && <div class="banner" style={{ padding: '6px 6px 6px 14px' }}>
         <span class="grow small">{h === undefined ? 'Hours not known yet' : h === null ? <b style={{ color: 'var(--red)' }}>Closed {day ? `on Day ${day}` : 'today'}</b> : <><b>Open {clock(h[0])}–{clock(h[1])}</b>{day ? ` on Day ${day}` : ' today'}</>}
           <br /><span class="muted">{checked ? `Checked with Google · ${checked}` : 'Checked with Google each morning'}</span></span>
         <a class="btn btn-quiet btn-sm press" href={maps} target="_blank" rel="noopener">Check hours<Icon.out /></a>
-      </div>
+      </div>}
 
       <Stepper label="Time there" hint={`(suggested ${duration(p.suggested)})`} value={p.minutes} show={duration} step={15} min={15} max={600} custom={p.minutes !== p.suggested} onChange={(v) => setMinutes(p.id, v)} />
 
       <button class="btn btn-quiet press" onClick={() => replaceTop({ kind: 'ask', place: p.id })}><Icon.chat />Ask about this</button>
 
       {p.photos?.urls.length ? <span class="muted small">Photo{p.photos.urls.length > 1 ? 's' : ''}: <a href={`https://${p.photos.lang}.wikipedia.org/wiki/${encodeURIComponent(p.photos.title.replace(/ /g, '_'))}`} target="_blank" rel="noopener">Wikipedia</a></span> : null}
-      {!p.scoring && (
+      {!p.scoring && !ticket && (
         <button class="link press" aria-expanded={why} onClick={() => setWhy(!why)}>Why {p.worth}?{why ? <Icon.up /> : <Icon.down />}</button>
       )}
       {why && (

@@ -3,9 +3,9 @@
 import type { DayMeta, Place, Status, Trip } from './model'
 import { days, nowIn, places, save, trips, tripPlaces, newId } from './data'
 import { between, byRank } from './rank'
-import { dayPlaces } from './planner'
+import { dayPlaces, planDay } from './planner'
 import { defaultFamily, PACE_DEFAULTS } from './people'
-import { localNow } from './time'
+import { clock, localNow } from './time'
 import type { Proposal } from './rebalance'
 
 const one = (id: string) => places.get()[id]
@@ -82,7 +82,22 @@ export function moveInDay(trip: Trip, day: number, id: string, prev?: string, ne
   if (!p) return
   const list = dayPlaces(tripPlaces(trip.id), day)
   const lo = list.find((x) => x.id === prev), hi = list.find((x) => x.id === next)
-  put({ ...p, dayRank: between(lo?.dayRank, hi?.dayRank) })
+  // Dragging a stop you'd pinned to a time lets the planner time it again (bookings keep theirs).
+  put({ ...p, dayRank: between(lo?.dayRank, hi?.dayRank), ...(p.fixed != null && !p.booked ? { fixed: null } : {}) })
+}
+
+/**
+ * Your own start time for a stop on a day (null = the planner times it). The stop moves to its
+ * place in the day's order, and the planner fits everything else around it.
+ */
+export function setTime(trip: Trip, id: string, min: number | null) {
+  const p = one(id)
+  if (!p || p.day == null) return
+  if (min == null) return put({ ...p, fixed: null }, `${p.name}: timed by the planner`)
+  const others = planDay(trip, p.day, tripPlaces(trip.id), days.get()[`${trip.id}:${p.day}`]).slots.filter((s) => s.kind === 'place' && s.id !== id)
+  const i = others.findIndex((s) => s.start > min)
+  const before = others[i === -1 ? others.length - 1 : i - 1]?.place, after = i === -1 ? undefined : others[i]?.place
+  put({ ...p, fixed: min, slotted: true, dayRank: between(before?.dayRank, after?.dayRank) }, `${p.name} at ${clock(min)}`)
 }
 
 /** "Go now": put a place into today, right after what's happening now (or first, before the next stop). */

@@ -153,6 +153,25 @@ await test('sample trip: checklist + Plan my days; Card Want it · Maybe · Skip
   await p.context().close()
 })
 
+await test('sample trip: set your own start time on the Card; Auto gives it back to the planner', async () => {
+  const p = await page()
+  await p.goto(BASE + '?demo#/t/demo-paris/plan/4')
+  await p.locator('.slot .open', { hasText: 'Eiffel Tower' }).click()
+  const t = p.getByLabel(/Start time/)
+  await t.fill('15:00')
+  await t.dispatchEvent('change')
+  await p.getByText('Eiffel Tower at 3:00 PM').waitFor()
+  await p.getByText('Set by you').waitFor()
+  await p.keyboard.press('Escape')
+  const row = p.locator('.slot', { hasText: 'Eiffel Tower' })
+  expect((await row.locator('.t').innerText()).trim() === '3:00', 'the day shows it at 3:00')
+  await row.locator('.open').click()
+  await p.getByRole('button', { name: 'Auto', exact: true }).click()
+  await p.getByText('Set by the planner').waitFor()
+  expect(p.errors.length === 0, 'no console errors: ' + p.errors.join(' | '))
+  await p.context().close()
+})
+
 await test('sample trip: Day view drag moves downtime; Back closes overlays first', async () => {
   const p = await page()
   await p.goto(BASE + '?demo#/t/demo-paris/plan/3')

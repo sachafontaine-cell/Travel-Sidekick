@@ -256,3 +256,6 @@ textarea.field { height: auto; padding: 10px 12px; resize: vertical; line-height
 .mapstile svg { width: 26px; height: 26px; }
 .mapstile svg:last-child { width: 16px; height: 16px; opacity: .6; }
 .desc { line-height: 1.45; }
+.timerow { display: flex; align-items: center; gap: 10px; }
+.timefield { width: 160px; flex-shrink: 0; padding: 0 8px; min-height: 48px; font-size: 17px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
+.timefield.custom { border-color: var(--gold); border-width: 2px; }

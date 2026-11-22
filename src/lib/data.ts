@@ -20,6 +20,8 @@ export interface Settings {
   alerts?: string[]
   /** A family link whose script address wasn't a web app URL (shown as a fix-it hint). */
   badApi?: string
+  /** The Gemini key has been handed to the family script. */
+  keyShared?: boolean
   energy?: { date: string; level: Energy }
 }
 export const settings = createStore<Settings>({}, 'settings')

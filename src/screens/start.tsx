@@ -13,7 +13,7 @@ import type { Place, Trip } from '../lib/model'
 
 type Step = { text: string; done: boolean }
 
-function bookingPlace(b: Booking, trip: Trip, rank: string): Place | null {
+export function bookingPlace(b: Booking, trip: Trip, rank: string): Place | null {
   const day = dayIndex(trip, b.date)
   const time = b.time ? parseClock(b.time) : null
   if (b.kind === 'hotel' || day < 1 || day > 99 || time == null || b.lat == null || b.lng == null) return null
@@ -55,7 +55,7 @@ export function Start({ trip }: { trip: Trip }) {
             if (p) { all.push(p); names.add(p.name.toLowerCase()) }
           }
           step(i, `Read ${bookings.length} booking${bookings.length === 1 ? '' : 's'} from your email`, true)
-        } catch { step(i, 'Could not read your email right now (skipped)', true) }
+        } catch (e) { step(i, `Could not read your email (${e instanceof Error ? e.message : 'unknown error'}). Skipped; try again from the Trip tab.`, true) }
         i++
       }
       step(i, 'Finding places for your family…')

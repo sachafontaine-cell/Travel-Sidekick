@@ -48,6 +48,9 @@ export async function syncNow(): Promise<void> {
     cursor.set(res.now)
     if (res.gk && !settings.get().geminiKey) settings.set({ ...settings.get(), geminiKey: res.gk })
     syncState.set({ at: Date.now(), script: res.v })
+    // A key saved before the script was connected: hand it over now (the script reads bookings with it).
+    const k = settings.get()
+    if (k.geminiKey && !k.keyShared) void shareKey(k.geminiKey)
     if ((res.v ?? 0) < SCRIPT_NEEDED) void call({ op: 'update' }).catch(() => {})
   } catch (e) {
     syncState.set({ ...syncState.get(), error: e instanceof Error ? e.message : 'Sync failed' })
@@ -58,7 +61,10 @@ export async function syncNow(): Promise<void> {
 }
 
 /** Gives the Gemini key to the script so the other phone gets it on its next sync. */
-export const shareKey = (gk: string) => (connected() ? call({ op: 'setKey', gk }).then(() => true, () => false) : Promise.resolve(false))
+export async function shareKey(gk: string): Promise<boolean> {
+  if (!connected()) return false
+  try { await call({ op: 'setKey', gk }); settings.set({ ...settings.get(), keyShared: true }); return true } catch { return false }
+}
 export const setAlerts = (emails: string[]) => call({ op: 'setAlerts', emails })
 
 export function startSync() {

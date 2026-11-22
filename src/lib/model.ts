@@ -79,8 +79,6 @@ export interface Place {
   done?: boolean
   /** Being scored by Gemini right now (added by hand). */
   scoring?: boolean
-  /** Real times from the hotel, from Google Maps via the family script (`from` = the hotel's spot). */
-  route?: { from: string; walk?: number; transit?: number; car?: number; km?: number; walkKm?: number; at: number }
   /** Suggested by a refresh after the trip settings changed; shows "New" until its card is opened. */
   fresh?: true
   /** The English Wikipedia article for this place, if Gemini knows one (checked before use). */

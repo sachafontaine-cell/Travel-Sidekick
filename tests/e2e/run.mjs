@@ -18,7 +18,7 @@ const expect = (ok, msg) => { if (!ok) throw new Error(msg) }
 
 const srv = await serve()
 const browser = await chromium.launch()
-const PHONE = { viewport: { width: 412, height: 915 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true }
+const PHONE = { viewport: { width: 412, height: 915 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, geolocation: { latitude: 48.8625, longitude: 2.3353 }, permissions: ['geolocation'] }
 
 async function page(opts = {}) {
   const ctx = await browser.newContext({ ...PHONE, serviceWorkers: 'block', ...opts })

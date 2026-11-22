@@ -1,10 +1,11 @@
 // Plan: "All" is the checklist (must-sees summary, every activity, Skipped); check what you want
 // and "Plan my days" fits it into the days. Each day chip shows that day's timeline.
-import { useMemo, useRef, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { createStore } from '../lib/store'
 import { BadgeChip, Icon, Spinner, StateChip } from '../ui'
 import { refreshList, refreshing, stale } from '../lib/refresh'
-import { fromHotel } from '../lib/routes'
+import { travelFrom } from '../lib/routes'
+import { here, locate } from '../lib/here'
 import { days, nowIn, places, plansFor, save, tripPlaces, trips } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
 import { moveInDay, moveInList, pushDown, setDay, setStatus } from '../lib/actions'
@@ -63,6 +64,9 @@ function sortList(list: Place[], f: Filters, trip: Trip): Place[] {
 
 function All({ trip }: { trip: Trip }) {
   const f = filters.use()
+  here.use()
+  // Times on each row are from where you are now.
+  useEffect(() => { void locate() }, [])
   const all = tripPlaces(trip.id)
   const now = nowIn(trip)
   const infos = mustInfo(trip, all, plansFor(trip), now.day, now.min)
@@ -195,7 +199,7 @@ function Row({ trip, p, draggable, onGrip }: { trip: Trip; p: Place; draggable: 
       <Tick p={p} />
       <button class="open press" onClick={() => open({ kind: 'card', place: p.id })}>
         <span class="name">{p.name}</span>
-        <span class="meta">{p.fresh && <span class="chip ok">New</span>}<BadgeChip p={p} />{p.scoring ? <span>Scoring…</span> : <span>Worth {p.worth} · {price(trip, p.price, false)}{trip.base && !p.booked ? (() => { const f = fromHotel(trip, p); return f ? ` · ${f.real ? '' : '≈'}${legText(f)}` : '' })() : ''}</span>}{p.day ? <span class="chip plain">Day {p.day}</span> : p.status === 'picked' && unfitIds.get().includes(p.id) ? <span class="chip amber">Doesn't fit</span> : null}{p.done && <span class="chip plain">Done</span>}</span>
+        <span class="meta">{p.fresh && <span class="chip ok">New</span>}<BadgeChip p={p} />{p.scoring ? <span>Scoring…</span> : <span>Worth {p.worth} · {price(trip, p.price, false)}{!p.booked && here.get().pt ? (() => { const f = travelFrom(trip, p, here.get().pt!); return f ? ` · ${f.real ? '' : '≈'}${legText(f)}` : '' })() : ''}</span>}{p.day ? <span class="chip plain">Day {p.day}</span> : p.status === 'picked' && unfitIds.get().includes(p.id) ? <span class="chip amber">Doesn't fit</span> : null}{p.done && <span class="chip plain">Done</span>}</span>
       </button>
       {draggable && <span class="handle" role="button" aria-label={`Drag to reorder ${p.name}`} onPointerDown={(e) => onGrip(e as unknown as PointerEvent)}><Icon.grip /></span>}
     </div>

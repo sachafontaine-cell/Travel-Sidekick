@@ -26,13 +26,23 @@ function useModel<T>(run: (key: string, model: string) => Promise<T>): Promise<T
   })
 }
 
+/** "2 adults (47, 42) and 2 kids (10, 8)": the group, for descriptions written for them. */
+export function groupLine(t: Pick<Trip, 'people'>): string {
+  const ages = t.people.map((p) => p.age).sort((a, b) => b - a)
+  const adults = ages.filter((a) => a >= 18), teens = ages.filter((a) => a >= 13 && a < 18), kids = ages.filter((a) => a < 13)
+  const part = (n: number[], one: string, many: string) => n.length ? `${n.length} ${n.length === 1 ? one : many} (${n.join(', ')})` : ''
+  return [part(adults, 'adult', 'adults'), part(teens, 'teen', 'teens'), part(kids, 'kid', 'kids')].filter(Boolean).join(' and ') || 'adults'
+}
+/** Descriptions are redone when the group changes. */
+export const groupKey = (t: Pick<Trip, 'people'>) => t.people.map((p) => p.age).sort((a, b) => b - a).join(',')
+
 /** The family and trip in a few lines (ages only, no names). */
 export function tripBrief(t: Trip): string {
   const ages = t.people.map((p) => p.age).sort((a, b) => b - a).join(', ')
   const b = ['$', '$$', '$$$']
   return [
     `Destination: ${t.dest.name}. Dates: ${t.start} to ${t.end}.`,
-    `Travelers' ages: ${ages}. Group walking limit: ${groupLimit(t).miles} miles/day.`,
+    `Group: ${groupLine(t)}. Travelers' ages: ${ages}. Group walking limit: ${groupLimit(t).miles} miles/day.`,
     `Vibe: ${describe(t.vibes, VIBE_NAMES)} (percent).`,
     `Budget: overall ${b[t.budget.all - 1]}${t.budget.lodging ? `, lodging ${b[t.budget.lodging - 1]}` : ''}${t.budget.food ? `, food ${b[t.budget.food - 1]}` : ''}${t.budget.activities ? `, activities ${b[t.budget.activities - 1]}` : ''}. Pace: ${t.pace}.`,
     `Day: ${clock(t.dayStart)} to ${clock(t.dayEnd)}${t.downtime.on ? `, ${t.downtime.minutes} min downtime` : ''}.`,
@@ -43,7 +53,7 @@ export function tripBrief(t: Trip): string {
 }
 
 const FIELDS = `Each place is one JSON object on its own line (JSON Lines, no array, no prose, no code fences):
-{"name":"","kind":"sight|museum|outdoors|tour|kids|meal|snack|show|shop|other","lat":0,"lng":0,"badge":"must|worth|depends|trap|gem","must":true,"worth":0-10,"value":0-10,"sub":{"iconic":0-10,"vibe":0-10,"hassle":0-10,"kid":0-10},"rec":"pay|cheaper|skip","recText":"one sentence, max 90 chars","desc":"2-3 sentences, max 300 chars: what it is and what this family will actually do there","why":"max 70 chars","tip":"max 100 chars","price":adult price per person in local currency (0 if free),"minutes":time to spend there with this family,"indoor":true|false,"hours":["Sun","Mon","Tue","Wed","Thu","Fri","Sat" each as "HH:MM-HH:MM" or "closed"],"wiki":"exact English Wikipedia article title about this exact place, or null"}
+{"name":"","kind":"sight|museum|outdoors|tour|kids|meal|snack|show|shop|other","lat":0,"lng":0,"badge":"must|worth|depends|trap|gem","must":true,"worth":0-10,"value":0-10,"sub":{"iconic":0-10,"vibe":0-10,"hassle":0-10,"kid":0-10},"rec":"pay|cheaper|skip","recText":"one sentence, max 90 chars","desc":"2-3 sentences, max 320 chars, written for THIS group: what it is, what each age will enjoy or find hard (name ages, e.g. the 8-year-old), and how to do it with them","why":"max 70 chars","tip":"max 100 chars","price":adult price per person in local currency (0 if free),"minutes":time to spend there with this family,"indoor":true|false,"hours":["Sun","Mon","Tue","Wed","Thu","Fri","Sat" each as "HH:MM-HH:MM" or "closed"],"wiki":"exact English Wikipedia article title about this exact place, or null"}
 Rules: "hassle" is LOW hassle (10 = easy). "value" = worth per money compared with similar options. "must" only for the true can't-miss sights (6 to 10 of them). Never mark a must-see "skip". Be honest about tourist traps. "meal" = sit-down lunch/dinner places near the main sights; "snack" = bakeries, ice cream, quick bites. Kinds: "sight" = landmarks, monuments, viewpoints, neighbourhoods; "outdoors" = parks, gardens, beaches, hikes, nature; "tour" = guided tours, boat trips, snorkeling, classes, excursions; "kids" = zoos, aquariums, theme and water parks, playgrounds; "show" = performances, concerts, nightlife; "shop" = shops and markets.`
 
 interface RawPlace { name: string; kind: Kind; lat: number; lng: number; badge: Badge; must: boolean; worth: number; value: number; sub: Place['sub']; rec: Place['rec']; recText: string; desc?: string; why: string; tip: string; price: number; minutes: number; indoor: boolean; hours?: string[]; wiki?: string | null }
@@ -72,7 +82,7 @@ export function toPlace(raw: RawPlace, trip: Trip, rank: string): Place | null {
     must: !!raw.must && raw.badge !== 'trap', value: clamp(raw.value), scoreV: 2,
     sub: { iconic: clamp(raw.sub?.iconic), vibe: clamp(raw.sub?.vibe), hassle: clamp(raw.sub?.hassle), kid: clamp(raw.sub?.kid) },
     worth: worthOf({ value: clamp(raw.value), sub: { iconic: clamp(raw.sub?.iconic), vibe: clamp(raw.sub?.vibe), hassle: clamp(raw.sub?.hassle), kid: clamp(raw.sub?.kid) } }, hasKids(trip)),
-    desc: raw.desc ? String(raw.desc).slice(0, 400) : undefined,
+    desc: raw.desc ? String(raw.desc).slice(0, 420) : undefined, descFor: raw.desc ? groupKey(trip) : undefined,
     rec: raw.must && raw.rec === 'skip' ? 'cheaper' : (['pay', 'cheaper', 'skip'] as const).includes(raw.rec) ? raw.rec : 'pay',
     recText: String(raw.recText ?? '').slice(0, 140), why: String(raw.why ?? '').slice(0, 120), tip: String(raw.tip ?? '').slice(0, 160),
     price: Math.max(0, Number(raw.price) || 0), minutes, suggested: minutes, indoor: !!raw.indoor,
@@ -118,9 +128,9 @@ export async function scorePlace(trip: Trip, name: string, rank: string): Promis
 
 /** A longer description for a place saved before descriptions existed (once, when its card opens). */
 export async function describePlace(trip: Trip, p: Place): Promise<string> {
-  const prompt = `In 2-3 sentences (max 300 characters, plain text), describe ${p.name} in ${trip.dest.name} for this family: what it is and what they'll actually do there.\n${tripBrief(trip)}`
+  const prompt = `In 2-3 sentences (max 320 characters, plain text), describe ${p.name} in ${trip.dest.name} for this group: ${groupLine(trip)}. Say what it is, what each age will enjoy or find hard (name the ages, e.g. "the 8-year-old"), and how to do it with them.\n${tripBrief(trip)}`
   const j = await useModel((key, model) => generate(key, model, { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 300 } }))
-  return answerText(j).trim().slice(0, 400)
+  return answerText(j).trim().slice(0, 420)
 }
 
 /** Ask: streams the answer; a final "ACTION {…}" line proposes a change the app can apply. */

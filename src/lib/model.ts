@@ -50,6 +50,8 @@ export interface Place {
   scoreV?: 2
   /** 2-3 sentences: what it is and what you'll do there. */
   desc?: string
+  /** The group's ages when desc was written (see groupKey); a different group gets a new one. */
+  descFor?: string
   worth: number
   value: number
   sub: { iconic: number; vibe: number; hassle: number; kid: number }

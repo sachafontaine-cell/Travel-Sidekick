@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { BadgeFull, Dialog, Icon, Stepper } from '../ui'
 import { nowIn, places, plansFor, save, settings } from '../lib/data'
-import { describePlace } from '../lib/ai'
+import { describePlace, groupKey } from '../lib/ai'
 import { hasKids, weights } from '../lib/score'
 import { close, open, replaceTop } from '../lib/nav'
 import { setDone, setMinutes, setMust, setStatus } from '../lib/actions'
@@ -42,9 +42,9 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
   useEffect(() => { if (p && !p.photos && !tried.has(id)) { tried.add(id); void photoFor(p, trip) } }, [id])
   // Places saved before descriptions existed get one the first time their card opens.
   useEffect(() => {
-    if (!p || p.desc || p.scoring || p.booked || described.has(id) || !settings.get().geminiKey) return
+    if (!p || (p.desc && p.descFor === groupKey(trip)) || p.scoring || p.booked || described.has(id) || !settings.get().geminiKey) return
     described.add(id)
-    describePlace(trip, p).then((d) => { const cur = places.get()[id]; if (d && cur) save('place', [{ ...cur, desc: d }]) }).catch(() => { /* offline: next time */ })
+    describePlace(trip, p).then((d) => { const cur = places.get()[id]; if (d && cur) save('place', [{ ...cur, desc: d, descFor: groupKey(trip) }]) }).catch(() => { /* offline: next time */ })
   }, [id])
   if (!p) return null
   const now = nowIn(trip)

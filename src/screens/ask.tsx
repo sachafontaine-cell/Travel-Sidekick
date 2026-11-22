@@ -23,7 +23,7 @@ function context(trip: Trip, placeId?: string): string {
   const musts = mustInfo(trip, all, plans, now.day, now.min).map((i) => `${i.place.name}: ${i.line}`).join('; ')
   return [
     tripBrief(trip),
-    `Now: day ${now.day} of the trip, ${clock(now.min)} local time.${wx ? ` Weather: ${wx.temp}°F${wx.rainAt != null ? `, rain from ${wx.rainAt}:00` : ''}.` : ''}`,
+    `Now: day ${now.day} of the trip, ${clock(now.min)} local time.${wx ? ` Weather: ${wx.temp}°C${wx.rainAt != null ? `, rain from ${wx.rainAt}:00` : ''}.` : ''}`,
     `Plan by day: ${plans.map((_, i) => `Day ${i + 1}: ${day(i + 1)}`).join(' | ')}`,
     `Must-sees: ${musts}`,
     `Other places (not on a day): ${all.filter((x) => x.day == null && x.status !== 'out' && !x.must).map((x) => `${x.name} (worth ${x.worth})`).join(', ')}`,

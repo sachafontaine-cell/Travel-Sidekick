@@ -15,46 +15,79 @@ export interface Change {
 }
 export interface Proposal { changes: Change[]; places: Place[]; note?: string }
 
-/**
- * First plan after the list is built: must-sees first (fewest open days first), then the most
- * worth-it places while days have room, a couple of meals per day. Returns every place.
- */
-export function autoPlan(trip: Trip, all: Place[], metas: Record<string, DayMeta> = {}): Place[] {
-  const n = tripDays(trip)
-  const work = all.map((p) => ({ ...p, day: p.fixed != null ? p.day : null }))
-  const list = () => work
-  const plan = (d: number) => planDay(trip, d, list(), metas[`${trip.id}:${d}`])
-  const days = Array.from({ length: n }, (_, i) => i + 1)
-  const cap = trip.pace === 'slow' ? 3 : trip.pace === 'packed' ? 5 : 4
-  const count = (d: number, meal: boolean) => dayPlaces(list(), d).filter((p) => (p.kind === 'meal') === meal).length
-  const place = (p: Place, meal: boolean) => {
+/** Puts one place on its best day among `days` (earliest end, least walking, lightest day). */
+function placer(trip: Trip, work: Place[], metas: Record<string, DayMeta>, days: number[], capBonus = 0) {
+  const plan = (d: number) => planDay(trip, d, work, metas[`${trip.id}:${d}`])
+  const cap = (trip.pace === 'slow' ? 3 : trip.pace === 'packed' ? 5 : 4) + capBonus
+  const count = (d: number, meal: boolean) => dayPlaces(work, d).filter((p) => (p.kind === 'meal') === meal).length
+  return (p: Place, meal: boolean): boolean => {
     let best: { day: number; rank: string; cost: number } | null = null
     for (const d of days) {
       if (hoursOn(p, dateOf(trip, d)) === null) continue
-      if (count(d, meal) >= (meal ? 2 : cap)) continue
+      if (count(d, meal) >= (meal ? 2 + capBonus : cap)) continue
       p.day = null
       const before = plan(d)
-      const others = dayPlaces(list(), d)
+      const others = dayPlaces(work, d)
       for (let i = 0; i <= others.length; i++) {
         p.day = d
         p.dayRank = between(others[i - 1]?.dayRank, others[i]?.dayRank)
         const after = plan(d)
         const slot = after.slots.find((s) => s.id === p.id)
         if (!slot || slot.warn || after.late || after.over || after.issues.length > before.issues.length) continue
-        const cost = (after.end - before.end) + after.walkMi * 8 + dayPlaces(list(), d).length * 20
+        const cost = (after.end - before.end) + after.walkMi * 8 + dayPlaces(work, d).length * 20
         if (!best || cost < best.cost) best = { day: d, rank: p.dayRank, cost }
       }
     }
     p.day = best?.day ?? null
-    if (best) { p.dayRank = best.rank; p.status = 'picked' }
+    if (best) p.dayRank = best.rank
+    return !!best
   }
-  const openDays = (p: Place) => days.filter((d) => hoursOn(p, dateOf(trip, d)) !== null).length
-  const musts = work.filter((p) => p.must && p.status !== 'out' && p.day == null).sort((a, b) => openDays(a) - openDays(b) || b.worth - a.worth)
-  for (const p of musts) place(p, false)
-  const vibe = (p: Place) => p.worth + p.sub.vibe * 0.2 + p.sub.kid * (trip.people.some((x) => x.age < 13) ? 0.15 : 0)
-  for (const p of work.filter((x) => !x.must && x.status !== 'out' && x.day == null && x.kind !== 'meal' && x.kind !== 'snack' && x.worth >= 7).sort((a, b) => vibe(b) - vibe(a))) place(p, false)
-  for (const p of work.filter((x) => x.status !== 'out' && x.day == null && x.kind === 'meal').sort((a, b) => vibe(b) - vibe(a))) place(p, true)
+}
+
+const openDays = (trip: Trip, p: Place, days: number[]) => days.filter((d) => hoursOn(p, dateOf(trip, d)) !== null).length
+const vibeOf = (trip: Trip) => (p: Place) => p.worth + p.sub.vibe * 0.2 + p.sub.kid * (trip.people.some((x) => x.age < 13) ? 0.15 : 0)
+const isMeal = (p: Place) => p.kind === 'meal' || p.kind === 'snack'
+
+/**
+ * First plan after the list is built: must-sees first (fewest open days first), then the most
+ * worth-it places while days have room, a couple of meals per day. Placed ones start checked.
+ */
+export function autoPlan(trip: Trip, all: Place[], metas: Record<string, DayMeta> = {}): Place[] {
+  const days = Array.from({ length: tripDays(trip) }, (_, i) => i + 1)
+  const work = all.map((p) => ({ ...p, day: p.fixed != null ? p.day : null }))
+  const place = placer(trip, work, metas, days)
+  const vibe = vibeOf(trip)
+  const pick = (p: Place, meal: boolean) => { if (place(p, meal)) p.status = 'picked' }
+  for (const p of work.filter((p) => p.must && p.status !== 'out' && p.day == null).sort((a, b) => openDays(trip, a, days) - openDays(trip, b, days) || b.worth - a.worth)) pick(p, false)
+  for (const p of work.filter((x) => !x.must && x.status !== 'out' && x.day == null && !isMeal(x) && x.worth >= 7).sort((a, b) => vibe(b) - vibe(a))) pick(p, false)
+  for (const p of work.filter((x) => x.status !== 'out' && x.day == null && x.kind === 'meal').sort((a, b) => vibe(b) - vibe(a))) pick(p, true)
   return work
+}
+
+/** What "Plan my days" would change: checked places with no day, unchecked ones still on a day. */
+export function planPending(all: Place[], fromDay: number) {
+  const add = all.filter((p) => p.status === 'picked' && p.day == null && !p.done && !p.scoring)
+  const remove = all.filter((p) => p.status !== 'picked' && p.day != null && p.day >= fromDay && p.fixed == null && !p.done)
+  return { add, remove }
+}
+
+/**
+ * "Plan my days": unchecked places leave the days, checked ones with no day are fitted in.
+ * Days already planned keep their stops; bookings, done places and today stay as they are.
+ */
+export function planChecked(trip: Trip, all: Place[], metas: Record<string, DayMeta>, fromDay: number): { places: Place[]; added: number; removed: number; unfit: Place[] } {
+  const days = Array.from({ length: tripDays(trip) }, (_, i) => i + 1).filter((d) => d >= fromDay)
+  const work = all.map((p) => ({ ...p }))
+  const { add, remove } = planPending(work, fromDay)
+  for (const p of remove) p.day = null
+  const place = placer(trip, work, metas, days, 1)
+  const vibe = vibeOf(trip)
+  const order = [...add].sort((a, b) => Number(isMeal(a)) - Number(isMeal(b)) || Number(b.must) - Number(a.must) || (a.must && b.must ? openDays(trip, a, days) - openDays(trip, b, days) : 0) || vibe(b) - vibe(a))
+  const unfit: Place[] = []
+  for (const p of order) if (!place(p, p.kind === 'meal')) unfit.push(p)
+  const before = new Map(all.map((p) => [p.id, p]))
+  const changed = work.filter((p) => { const o = before.get(p.id)!; return o.day !== p.day || (p.day != null && o.dayRank !== p.dayRank) })
+  return { places: changed, added: add.length - unfit.length, removed: remove.length, unfit }
 }
 
 export function rebalance(trip: Trip, all: Place[], metas: Record<string, DayMeta>, today: number, now: number): Proposal {

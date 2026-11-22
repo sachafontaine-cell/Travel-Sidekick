@@ -66,7 +66,7 @@ export function Today({ trip }: { trip: Trip }) {
   const header = (title: string, eyebrow: string) => (
     <div class="between" style={{ alignItems: 'flex-end' }}>
       <div><p class="eyebrow">{eyebrow}</p><h1 class="h1">{title}</h1></div>
-      {wx && wx.date === now.date && <span class="strong" style={{ textAlign: 'right' }}>{wx.temp}°{wx.rainAt != null && <><br /><span class="muted small">rain at {wx.rainAt % 12 || 12} {wx.rainAt < 12 ? 'AM' : 'PM'}</span></>}</span>}
+      {wx && wx.c && wx.date === now.date && <span class="strong" style={{ textAlign: 'right' }}>{wx.temp}°C{wx.rainAt != null && <><br /><span class="muted small">rain at {wx.rainAt % 12 || 12} {wx.rainAt < 12 ? 'AM' : 'PM'}</span></>}</span>}
     </div>
   )
 

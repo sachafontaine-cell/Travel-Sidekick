@@ -238,8 +238,14 @@ textarea.field { height: auto; padding: 10px 12px; resize: vertical; line-height
 
 /* Pick toggle on list rows: ○ Maybe, ✓ Picked, ↺ skipped (bring back). 44 px target, 26 px circle. */
 .tick { width: 44px; height: 52px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.tick > span { width: 26px; height: 26px; border-radius: 13px; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; transition: background 120ms ease-out, border-color 120ms ease-out; }
+.tick > span { width: 26px; height: 26px; border-radius: 7px; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; transition: background 120ms ease-out, border-color 120ms ease-out; }
 .tick svg { width: 16px; height: 16px; stroke-width: 3; }
 .tick.on > span { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .tick.out > span { border-style: dashed; color: var(--muted); }
 .tick.out svg { stroke-width: 2; }
+
+/* "Plan my days": sticky over the list while the checks and the days disagree. Ask hides meanwhile. */
+.planbar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 10px; margin: 0 -4px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(20, 33, 61, .16); }
+.planbar .small { color: var(--muted); max-width: 40%; }
+.shell:has(.planbar) .fab { display: none; }
+.center { text-align: center; }

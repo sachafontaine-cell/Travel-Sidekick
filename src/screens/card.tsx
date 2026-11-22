@@ -62,7 +62,7 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
       {/* Where it stands: one tap, always visible. Must-sees can't be skipped. */}
       <div class="seg" role="group" aria-label="In the plan">
         {(['picked', 'maybe', 'out'] as const).map((s) => s === 'out' && p.must ? null : (
-          <button class={p.status === s ? 'on press' : 'press'} aria-pressed={p.status === s} onClick={() => setStatus(p.id, s)}>{s === 'picked' ? 'Pick' : s === 'maybe' ? 'Maybe' : 'Skip'}</button>
+          <button class={p.status === s ? 'on press' : 'press'} aria-pressed={p.status === s} onClick={() => setStatus(p.id, s)}>{s === 'picked' ? 'Want it' : s === 'maybe' ? 'Maybe' : 'Skip'}</button>
         ))}
       </div>
       {p.status !== 'out' && (

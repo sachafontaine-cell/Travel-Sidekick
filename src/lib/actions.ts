@@ -15,7 +15,8 @@ export function setStatus(id: string, status: Status) {
   const p = one(id)
   if (!p || p.status === status) return
   if (p.must && status === 'out') return pushDown(id)
-  const label = status === 'out' ? `${p.name} skipped` : status === 'picked' ? `${p.name} picked` : `${p.name} moved to Maybe`
+  // Checking and unchecking is instant and obvious; only skipping (it hides the place) gets a toast.
+  const label = status === 'out' ? `${p.name} skipped` : p.status === 'out' ? `${p.name} is back` : undefined
   // Skipped places leave their day.
   put({ ...p, status, ...(status === 'out' ? { day: null } : {}) }, label)
 }

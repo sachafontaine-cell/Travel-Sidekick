@@ -62,8 +62,8 @@ export function AddSheet({ trip, day }: { trip: Trip; day?: number }) {
     <Sheet title={day ? `Add to Day ${day}` : 'Add a place'}>
       <input class="field" autoFocus enterKeyHint="done" placeholder="Name, e.g. Musée Grévin" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') void add('picked') }} />
       <div class="row">
-        <button class="btn btn-primary grow press" disabled={!name.trim()} onClick={() => add('picked')}>{day ? `Add to Day ${day}` : 'Add to Picked'}</button>
-        {!day && <button class="btn btn-quiet press" disabled={!name.trim()} onClick={() => add('maybe')}>Maybe</button>}
+        <button class="btn btn-primary grow press" disabled={!name.trim()} onClick={() => add('picked')}>{day ? `Add to Day ${day}` : 'Add, checked'}</button>
+        {!day && <button class="btn btn-quiet press" disabled={!name.trim()} onClick={() => add('maybe')}>Unchecked</button>}
       </div>
       <p class="muted small">Gemini scores it in a few seconds.</p>
     </Sheet>

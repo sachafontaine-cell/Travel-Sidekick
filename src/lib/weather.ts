@@ -4,15 +4,16 @@ import { createStore, DEMO } from './store'
 import type { Destination, Trip } from './model'
 import { currencyOf, langOf } from './money'
 
-export interface Weather { date: string; temp: number; rainAt?: number; at: number }
+/** temp in °C. */
+export interface Weather { date: string; temp: number; c?: true; rainAt?: number; at: number }
 export const weather = createStore<Record<string, Weather>>({}, 'weather')
 
 export async function refreshWeather(trip: Trip, date: string, hourNow: number): Promise<void> {
-  if (DEMO) { weather.set({ ...weather.get(), [trip.id]: { date, temp: 68, rainAt: 16, at: Date.now() } }); return }
+  if (DEMO) { weather.set({ ...weather.get(), [trip.id]: { date, temp: 20, c: true, rainAt: 16, at: Date.now() } }); return }
   const cur = weather.get()[trip.id]
-  if (cur && cur.date === date && Date.now() - cur.at < 3600000) return
+  if (cur && cur.c && cur.date === date && Date.now() - cur.at < 3600000) return
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${trip.dest.lat}&longitude=${trip.dest.lng}&hourly=temperature_2m,precipitation_probability&temperature_unit=fahrenheit&timezone=${encodeURIComponent(trip.dest.tz)}&start_date=${date}&end_date=${date}`
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${trip.dest.lat}&longitude=${trip.dest.lng}&hourly=temperature_2m,precipitation_probability&timezone=${encodeURIComponent(trip.dest.tz)}&start_date=${date}&end_date=${date}`
     const r = await fetch(url)
     if (!r.ok) return
     const j = await r.json() as { hourly?: { time: string[]; temperature_2m: number[]; precipitation_probability: (number | null)[] } }
@@ -21,7 +22,7 @@ export async function refreshWeather(trip: Trip, date: string, hourNow: number):
     const idx = Math.min(h.time.length - 1, Math.max(0, h.time.findIndex((t) => +t.slice(11, 13) >= hourNow)))
     let rainAt: number | undefined
     for (let i = Math.max(idx, 0); i < h.time.length; i++) if ((h.precipitation_probability[i] ?? 0) >= 60) { rainAt = +h.time[i].slice(11, 13); break }
-    weather.set({ ...weather.get(), [trip.id]: { date, temp: Math.round(h.temperature_2m[idx]), rainAt, at: Date.now() } })
+    weather.set({ ...weather.get(), [trip.id]: { date, temp: Math.round(h.temperature_2m[idx]), c: true, rainAt, at: Date.now() } })
   } catch { /* offline: keep the last one */ }
 }
 

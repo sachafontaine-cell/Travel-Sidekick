@@ -1,13 +1,14 @@
-// Plan: "All" is the master list (must-sees summary, Picked, Maybe, Skipped); each day chip
-// shows that day's timeline. Days are views of the same list.
+// Plan: "All" is the checklist (must-sees summary, every activity, Skipped); check what you want
+// and "Plan my days" fits it into the days. Each day chip shows that day's timeline.
 import { useMemo, useRef, useState } from 'preact/hooks'
+import { createStore } from '../lib/store'
 import { BadgeChip, Icon, StateChip } from '../ui'
-import { days, nowIn, places, plansFor, tripPlaces, trips } from '../lib/data'
+import { days, nowIn, places, plansFor, save, tripPlaces, trips } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
 import { moveInDay, moveInList, pushDown, setDay, setStatus } from '../lib/actions'
 import { startDrag, swipeable } from '../lib/gestures'
 import { countdown, mustInfo } from '../lib/musts'
-import { rebalance } from '../lib/rebalance'
+import { planChecked, planPending, rebalance } from '../lib/rebalance'
 import { dateOf, tripDays, type Slot } from '../lib/planner'
 import { clock, shortDate, WEEKDAY, weekday } from '../lib/time'
 import { price } from '../lib/money'
@@ -65,11 +66,11 @@ function All({ trip }: { trip: Trip }) {
   const c = countdown(trip, infos, now.day)
   const risky = infos.filter((i) => i.state !== 'done' && i.state !== 'scheduled')
   const [showOut, setShowOut] = useState(false)
-  const picked = sortList(all.filter((p) => p.status === 'picked'), f, trip)
-  const maybe = sortList(all.filter((p) => p.status === 'maybe'), f, trip)
+  const list = sortList(all.filter((p) => p.status !== 'out'), f, trip)
   const out = sortList(all.filter((p) => p.status === 'out'), { ...f, hideTraps: false }, trip)
   const custom = f.sort !== 'mine' || f.hideTraps === false || f.under || f.kids || f.near
   const checked = all.filter((p) => p.must && p.hours?.source === 'google' && p.hours.checkedAt).map((p) => p.hours!.checkedAt!).sort().at(-1)
+  const ticked = list.filter((p) => p.status === 'picked').length
 
   return (
     <>
@@ -93,11 +94,41 @@ function All({ trip }: { trip: Trip }) {
         <button class="pill press" onClick={() => open({ kind: 'sheet', name: 'add', arg: trip.id })}><Icon.plus />Add</button>
       </div>
 
-      <Section trip={trip} title={`Picked (${picked.length})`} list={picked} status="picked" draggable={f.sort === 'mine'} />
-      <Section trip={trip} title={`Maybe (${maybe.length})`} list={maybe} status="maybe" draggable={f.sort === 'mine'} />
+      <Section trip={trip} title={`Activities · ${ticked} checked`} list={list} status="picked" draggable={f.sort === 'mine'} />
       {out.length > 0 && <button class="fold press" aria-expanded={showOut} onClick={() => setShowOut(!showOut)}>Skipped ({out.length}){showOut ? <Icon.up /> : <Icon.down />}</button>}
       {showOut && <Section trip={trip} list={out} status="out" draggable={false} />}
+      <PlanBar trip={trip} />
     </>
+  )
+}
+
+/** Places that didn't fit the last time "Plan my days" ran (so the bar doesn't nag about them). */
+const unfitIds = createStore<string[]>([])
+
+/** Sticky at the bottom whenever the checks and the days disagree. */
+function PlanBar({ trip }: { trip: Trip }) {
+  const unfit = unfitIds.use()
+  const now = nowIn(trip)
+  const fromDay = now.day >= 1 ? now.day + 1 : 1
+  if (fromDay > tripDays(trip)) return null
+  const all = tripPlaces(trip.id)
+  const { add, remove } = planPending(all, fromDay)
+  const fresh = add.filter((p) => !unfit.includes(p.id))
+  if (!fresh.length && !remove.length) {
+    return add.length ? <p class="muted small center">{add.length} checked {add.length === 1 ? "doesn't" : "don't"} fit the days: {add.map((p) => p.name).join(', ')}.</p> : null
+  }
+  const run = () => {
+    const r = planChecked(trip, all, days.get(), fromDay)
+    unfitIds.set(r.unfit.map((p) => p.id))
+    const parts = [r.added && `${r.added} added`, r.removed && `${r.removed} removed`, r.unfit.length && `${r.unfit.length} didn't fit`].filter(Boolean)
+    save('place', r.places, `Days planned${parts.length ? ` · ${parts.join(' · ')}` : ''}`)
+  }
+  const what = [fresh.length && `${fresh.length} to add`, remove.length && `${remove.length} to remove`].filter(Boolean).join(' · ')
+  return (
+    <div class="planbar">
+      <button class="btn btn-primary grow press" onClick={run}><Icon.plan />Plan my days</button>
+      <span class="small">{what}{now.day >= 1 ? ' · from tomorrow' : ''}</span>
+    </div>
   )
 }
 
@@ -106,8 +137,8 @@ function Section({ trip, title, list, status, draggable }: { trip: Trip; title?:
   if (!list.length && status === 'out') return null
   return (
     <div class="section">
-      {title && <div class="section-h"><span class="label">{title}</span>{status === 'picked' && list.length > 0 && <span class="muted small">Swipe ← to skip</span>}</div>}
-      {list.length === 0 ? <p class="muted small">{status === 'picked' ? 'Tap ○ on a place to pick it.' : 'Nothing here.'}</p> : (
+      {title && <div class="section-h"><span class="label">{title}</span>{list.length > 0 && <span class="muted small">Check what you want</span>}</div>}
+      {list.length === 0 ? <p class="muted small">Nothing here. Tap + Add.</p> : (
         <div class="list" ref={ref}>
           {list.map((p, i) => <Row trip={trip} p={p} draggable={draggable} onGrip={(e) => ref.current && startDrag(e, ref.current, i, (from, to) => {
             const rest = list.filter((_, k) => k !== from)
@@ -119,12 +150,12 @@ function Section({ trip, title, list, status, draggable }: { trip: Trip; title?:
   )
 }
 
-/** ○ = Maybe, ✓ = Picked (tap to switch), ↺ on a skipped place brings it back. Swipe ← skips, → picks. */
+/** The checkbox: checked = want it. ↺ on a skipped place brings it back. Swipe ← skips, → checks. */
 export function Tick({ p }: { p: Place }) {
   const on = p.status === 'picked'
   const act = () => setStatus(p.id, on ? 'maybe' : p.status === 'out' ? 'maybe' : 'picked')
-  const label = on ? `${p.name}: picked (tap for Maybe)` : p.status === 'out' ? `Bring back ${p.name}` : `Pick ${p.name}`
-  return <button class={`tick press${on ? ' on' : ''}${p.status === 'out' ? ' out' : ''}`} aria-label={label} aria-pressed={on} onClick={act}><span>{on ? <Icon.check /> : p.status === 'out' ? <Icon.refresh /> : null}</span></button>
+  if (p.status === 'out') return <button class="tick out press" aria-label={`Bring back ${p.name}`} onClick={act}><span><Icon.refresh /></span></button>
+  return <button class={`tick press${on ? ' on' : ''}`} role="checkbox" aria-checked={on} aria-label={p.name} onClick={act}><span>{on ? <Icon.check /> : null}</span></button>
 }
 
 function Row({ trip, p, draggable, onGrip }: { trip: Trip; p: Place; draggable: boolean; onGrip: (e: PointerEvent) => void }) {
@@ -132,11 +163,11 @@ function Row({ trip, p, draggable, onGrip }: { trip: Trip; p: Place; draggable: 
   const right = p.status === 'picked' ? undefined : () => setStatus(p.id, p.status === 'out' ? 'maybe' : 'picked')
   const sw = swipeable(left, right)
   return (
-    <div class={`prow${p.done ? ' done' : ''}`} data-drag data-left={p.must ? 'To the bottom' : 'Skip'} data-right={p.status === 'out' ? 'Maybe' : 'Pick'} {...sw}>
+    <div class={`prow${p.done ? ' done' : ''}`} data-drag data-left={p.must ? 'To the bottom' : 'Skip'} data-right={p.status === 'out' ? 'Bring back' : 'Check'} {...sw}>
       <Tick p={p} />
       <button class="open press" onClick={() => open({ kind: 'card', place: p.id })}>
         <span class="name">{p.name}</span>
-        <span class="meta"><BadgeChip p={p} />{p.scoring ? <span>Scoring…</span> : <span>Worth {p.worth} · {price(trip, p.price, false)}</span>}{p.day ? <span class="chip plain">Day {p.day}</span> : null}{p.done && <span class="chip plain">Done</span>}</span>
+        <span class="meta"><BadgeChip p={p} />{p.scoring ? <span>Scoring…</span> : <span>Worth {p.worth} · {price(trip, p.price, false)}</span>}{p.day ? <span class="chip plain">Day {p.day}</span> : p.status === 'picked' && unfitIds.get().includes(p.id) ? <span class="chip amber">Doesn't fit</span> : null}{p.done && <span class="chip plain">Done</span>}</span>
       </button>
       {draggable && <span class="handle" role="button" aria-label={`Drag to reorder ${p.name}`} onPointerDown={(e) => onGrip(e as unknown as PointerEvent)}><Icon.grip /></span>}
     </div>

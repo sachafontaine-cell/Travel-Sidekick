@@ -4,7 +4,7 @@ import { minus, plus } from './vibes'
 import { demoTrip } from './demo'
 import { planAll, planDay, dayIndex, tripDays } from './planner'
 import { countdown, mustInfo } from './musts'
-import { rebalance, slotBookings } from './rebalance'
+import { planChecked, rebalance, slotBookings } from './rebalance'
 import { gapNow, ideas } from './whatnow'
 import { groupLimit, suggestedMiles } from './people'
 import { clock, weekday } from './time'
@@ -99,6 +99,19 @@ describe('must-sees, rebalance and what now', () => {
     const orsay = infos.find((i) => i.place.name === "Musée d'Orsay")!
     expect(orsay.state).toBe('risk')
     expect(infos.find((i) => i.place.name.startsWith('Louvre'))!.line).toBe('Was planned at 9:30 AM. Done?')
+  })
+  it('Plan my days fits checked places, drops unchecked ones, keeps today and before', () => {
+    const tuileries = places.find((p) => p.name === 'Tuileries Garden')!
+    const onLater = places.find((p) => p.day != null && p.day > 3 && p.fixed == null && !p.must)!
+    const today = places.filter((p) => p.day === 3)
+    const input = places.map((p) => p.id === tuileries.id ? { ...p, status: 'picked' as const, day: null } : p.id === onLater.id ? { ...p, status: 'maybe' as const } : p)
+    const r = planChecked(trip, input, {}, 4)
+    const after: Place[] = input.map((p) => r.places.find((x) => x.id === p.id) ?? p)
+    expect(after.find((p) => p.id === onLater.id)!.day).toBeNull()
+    expect(after.find((p) => p.id === tuileries.id)!.day).toBeGreaterThanOrEqual(4)
+    expect(r.removed).toBe(1)
+    for (const p of today) expect(after.find((x) => x.id === p.id)!.day).toBe(3)
+    for (let d = 4; d <= 7; d++) { const pl = planDay(trip, d, after); expect(pl.late || pl.over).toBe(false) }
   })
   it('rebalance saves the at-risk must-see on an open day without breaking any day', () => {
     const r = rebalance(trip, places, {}, 3, 11 * 60 + 40)

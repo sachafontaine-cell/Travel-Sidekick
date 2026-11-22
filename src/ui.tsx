@@ -33,6 +33,7 @@ export const Icon = {
   walk: () => svg(<><circle cx="13" cy="4.5" r="1.8" /><path d="M10 21l2-6 3 2v4M8.5 11l2.5-3.5 3 1.5 2 3M11 8l-1 6" /></>),
   train: () => svg(<><rect x="6" y="3" width="12" height="13" rx="3" /><path d="M6 10h12M9 19l-2 2M15 19l2 2M9 13h.01M15 13h.01" /></>),
   rest: () => svg(<><path d="M3 18v-6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v6M3 15h18M6 9V6" /></>),
+  photo: () => svg(<><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="10" r="1.8" /><path d="M21 16l-5-5-8 8" /></>),
   cloud: () => svg(<><path d="M7 17a4 4 0 1 1 1-7.9A5 5 0 0 1 17.5 10a3.5 3.5 0 0 1-.5 7z" /><path d="M9 20l-1 1.5M13 20l-1 1.5M17 20l-1 1.5" /></>),
 }
 

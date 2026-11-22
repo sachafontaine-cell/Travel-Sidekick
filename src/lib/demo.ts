@@ -1,4 +1,5 @@
 // The sample trip shown with ?demo: a made-up family of four in Paris. Never mixed with real data.
+import { worthOf } from './score'
 import type { Kind, Place, Trip } from './model'
 import { spread } from './rank'
 
@@ -73,7 +74,7 @@ export function demoTrip(): { trip: Trip; places: Place[] } {
     if (s.day) byDay.set(s.day, n + 1)
     return {
       id: `demo-${i}`, trip: T, name: s.name, kind: s.kind, lat: s.lat, lng: s.lng, badge: s.badge, must: !!s.must,
-      worth: s.worth, value: s.value, sub: { iconic: s.sub[0], vibe: s.sub[1], hassle: s.sub[2], kid: s.sub[3] },
+      worth: worthOf({ value: s.value, sub: { iconic: s.sub[0], vibe: s.sub[1], hassle: s.sub[2], kid: s.sub[3] } }, true), scoreV: 2, value: s.value, sub: { iconic: s.sub[0], vibe: s.sub[1], hassle: s.sub[2], kid: s.sub[3] },
       rec: s.rec, recText: s.recText, why: s.why, tip: s.tip, price: s.price, minutes: s.minutes, suggested: s.minutes,
       indoor: !!s.indoor, hours: s.h ? { ...s.h, checkedAt: Date.now() - 3 * 3600000 } : undefined,
       status: s.status ?? 'picked', rank: ranks[i], day: s.day ?? null, dayRank: s.day ? 'b' + String.fromCharCode(97 + (s.o ?? n)) : undefined,

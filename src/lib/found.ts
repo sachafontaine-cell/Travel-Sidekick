@@ -10,6 +10,7 @@ import { days, places, save, trips, tripPlaces, type Rec } from './data'
 import { currencyOf, langOf } from './money'
 import { defaultFamily } from './people'
 import { slotBookings } from './rebalance'
+import { rescore } from './score'
 
 export function afterMerge(incoming: Rec[]) {
   const tripIds = new Set<string>()
@@ -29,6 +30,8 @@ export function afterMerge(incoming: Rec[]) {
       }
       save('trip', [done])
     }
+    const re = rescore(trips.get()[id], tripPlaces(id))
+    if (re.length) save('place', re)
     const moved = slotBookings(trips.get()[id], tripPlaces(id), days.get())
     if (moved.length) save('place', moved)
   }

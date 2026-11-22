@@ -46,6 +46,10 @@ export interface Place {
   badge: Badge
   /** The family's call (starts as the AI's). Must-sees are never skipped. */
   must: boolean
+  /** 2 = worth computed from the bars (see score.ts). */
+  scoreV?: 2
+  /** 2-3 sentences: what it is and what you'll do there. */
+  desc?: string
   worth: number
   value: number
   sub: { iconic: number; vibe: number; hassle: number; kid: number }

@@ -249,4 +249,10 @@ textarea.field { height: auto; padding: 10px 12px; resize: vertical; line-height
 .planbar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 10px; margin: 0 -4px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(20, 33, 61, .16); }
 .planbar .small { color: var(--muted); max-width: 40%; }
 .shell:has(.planbar) .fab { display: none; }
-.center { text-align: center; }
+.tcenter { text-align: center; }
+.mapstile { flex: 0 0 150px; height: 150px; border-radius: 14px; background: var(--tile); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; text-align: center; font-weight: 600; font-size: 15px; color: var(--text); text-decoration: none; scroll-snap-align: center; }
+.photos .mapstile { height: 190px; }
+.photos:not(:has(img)) .mapstile { height: 150px; }
+.mapstile svg { width: 26px; height: 26px; }
+.mapstile svg:last-child { width: 16px; height: 16px; opacity: .6; }
+.desc { line-height: 1.45; }

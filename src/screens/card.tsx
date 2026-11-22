@@ -2,7 +2,9 @@
 // It's the one place for anything about a single place: star, day, time there, done.
 import { useEffect, useState } from 'preact/hooks'
 import { BadgeFull, Dialog, Icon, Stepper } from '../ui'
-import { nowIn, places, plansFor } from '../lib/data'
+import { nowIn, places, plansFor, save, settings } from '../lib/data'
+import { describePlace } from '../lib/ai'
+import { hasKids, weights } from '../lib/score'
 import { close, open, replaceTop } from '../lib/nav'
 import { setDone, setMinutes, setMust, setStatus } from '../lib/actions'
 import { dateOf, hoursOn } from '../lib/planner'
@@ -11,18 +13,25 @@ import { price } from '../lib/money'
 import type { Place, Trip } from '../lib/model'
 import { photoFor } from '../lib/background'
 
-export function Photos({ p, size = 'big' }: { p: Place; size?: 'big' | 'thumb' }) {
+/** Google Maps photos, as a square tile where a photo would be (or after the photos). */
+function MapsTile({ href }: { href: string }) {
+  return <a class="mapstile press" href={href} target="_blank" rel="noopener"><Icon.photo /><span>Photos on Google Maps</span><Icon.out /></a>
+}
+
+export function Photos({ p, size = 'big', maps }: { p: Place; size?: 'big' | 'thumb'; maps?: string }) {
   const urls = p.photos?.urls ?? []
-  if (!urls.length) return null
+  if (!urls.length) return maps && size === 'big' ? <div class="photos"><MapsTile href={maps} /></div> : null
   if (size === 'thumb') return <img class="thumb" src={urls[0]} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onLoad={(e) => (e.currentTarget as HTMLImageElement).classList.add('in')} />
   return (
     <div class={`photos${urls.length === 1 ? ' one' : ''}`}>
       {urls.map((u) => <img src={u} alt={`${p.name}`} loading="lazy" decoding="async" referrerpolicy="no-referrer" onLoad={(e) => (e.currentTarget as HTMLImageElement).classList.add('in')} />)}
+      {maps && <MapsTile href={maps} />}
     </div>
   )
 }
 
 const tried = new Set<string>()
+const described = new Set<string>()
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const REC = { pay: 'Pay for it', cheaper: 'Do the cheaper version', skip: 'Skip it' }
 
@@ -31,6 +40,12 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
   const [why, setWhy] = useState(false)
   // Photos are looked up in the background; if this one hasn't been yet, do it now (never blocks).
   useEffect(() => { if (p && !p.photos && !tried.has(id)) { tried.add(id); void photoFor(p, trip) } }, [id])
+  // Places saved before descriptions existed get one the first time their card opens.
+  useEffect(() => {
+    if (!p || p.desc || p.scoring || p.booked || described.has(id) || !settings.get().geminiKey) return
+    described.add(id)
+    describePlace(trip, p).then((d) => { const cur = places.get()[id]; if (d && cur) save('place', [{ ...cur, desc: d }]) }).catch(() => { /* offline: next time */ })
+  }, [id])
   if (!p) return null
   const now = nowIn(trip)
   const day = p.day ?? null
@@ -48,7 +63,7 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
         </button>
         <div class="row"><BadgeFull p={p} /><button class="iconbtn ring press" aria-label="Close" onClick={close}><Icon.x /></button></div>
       </div>
-      <Photos p={p} />
+      <Photos p={p} maps={maps} />
       <h2 class="h2">{p.name}</h2>
 
       {p.scoring ? <p class="muted">Scoring… a few seconds.</p> : (
@@ -57,7 +72,8 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
           <div class="stat" style={{ textAlign: 'right' }}><span class="muted small">Price</span><span class="big num" style={{ fontSize: '20px' }}>{price(trip, p.price)}</span>{p.price > 0 && <span class="muted small">{price(trip, group, false)} for {trip.people.length}</span>}</div>
         </div>
       )}
-      {p.recText && <p><b>{REC[p.rec]}.</b> {cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?)[:.,;]?\s*/i, ''))}</p>}
+      {p.recText && <p><b>{p.rec === 'pay' && p.price === 0 ? 'Go for it' : REC[p.rec]}.</b> {cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?)[:.,;]?\s*/i, ''))}</p>}
+      {p.desc ? <p class="desc">{p.desc}</p> : !p.scoring && !p.booked && settings.get().geminiKey ? <p class="muted small">Getting a description…</p> : null}
 
       {/* Where it stands: one tap, always visible. Must-sees can't be skipped. */}
       <div class="seg" role="group" aria-label="In the plan">
@@ -82,16 +98,16 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
 
       <button class="btn btn-quiet press" onClick={() => replaceTop({ kind: 'ask', place: p.id })}><Icon.chat />Ask about this</button>
 
-      <a class="link press" href={maps} target="_blank" rel="noopener">Photos on Google Maps<Icon.out /></a>
       {p.photos?.urls.length ? <span class="muted small">Photo{p.photos.urls.length > 1 ? 's' : ''}: <a href={`https://${p.photos.lang}.wikipedia.org/wiki/${encodeURIComponent(p.photos.title.replace(/ /g, '_'))}`} target="_blank" rel="noopener">Wikipedia</a></span> : null}
       {!p.scoring && (
         <button class="link press" aria-expanded={why} onClick={() => setWhy(!why)}>Why {p.worth}?{why ? <Icon.up /> : <Icon.down />}</button>
       )}
       {why && (
         <div class="stack">
-          {([['Value', p.value], ['Iconic', p.sub.iconic], ['Vibe fit', p.sub.vibe], ['Low hassle', p.sub.hassle], ['Kid fit', p.sub.kid]] as const).map(([k, v]) => (
+          <p class="muted small">{p.worth} = {weights(hasKids(trip)).map(([k, w]) => `${k} ${Math.round(w * 100)}%`).join(' + ')}</p>
+          {weights(hasKids(trip)).map(([k]) => { const v = k === 'Value' ? p.value : k === 'Iconic' ? p.sub.iconic : k === 'Vibe fit' ? p.sub.vibe : k === 'Kid fit' ? p.sub.kid : p.sub.hassle; return (
             <div class="score"><span>{k}</span><div class="bar"><span style={{ width: `${v * 10}%` }} /></div><b class="num">{v}</b></div>
-          ))}
+          ) })}
           {p.why && <p><b>Why:</b> {p.why}</p>}
           {p.tip && <p><b>Tip:</b> {p.tip}</p>}
         </div>

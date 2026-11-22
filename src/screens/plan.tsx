@@ -125,7 +125,7 @@ function PlanBar({ trip }: { trip: Trip }) {
   const { add, remove } = planPending(all, fromDay)
   const fresh = add.filter((p) => !unfit.includes(p.id))
   if (!fresh.length && !remove.length) {
-    return add.length ? <p class="muted small center">{add.length} checked {add.length === 1 ? "doesn't" : "don't"} fit the days: {add.map((p) => p.name).join(', ')}.</p> : null
+    return add.length ? <p class="muted small tcenter">{add.length} checked {add.length === 1 ? "doesn't" : "don't"} fit the days: {add.map((p) => p.name).join(', ')}.</p> : null
   }
   const run = () => {
     const r = planChecked(trip, all, days.get(), fromDay)
@@ -223,7 +223,7 @@ function Day({ trip, day }: { trip: Trip; day: number }) {
         </div>
       )}
       {day >= now.day && <button class="btn btn-secondary press" onClick={() => open({ kind: 'sheet', name: 'addday', arg: String(day) })}><Icon.plus />Add to this day</button>}
-      {slots.some((s) => s.place) && <p class="muted small center">Swipe ← to take a stop off this day.</p>}
+      {slots.some((s) => s.place) && <p class="muted small tcenter">Swipe ← to take a stop off this day.</p>}
     </>
   )
 }

@@ -2,13 +2,14 @@ import { render } from 'preact'
 import './styles.css'
 import { App } from './app'
 import { DEMO } from './lib/store'
-import { places, settings, trips } from './lib/data'
+import { places, save, settings, tripPlaces, trips } from './lib/data'
 import { demoTrip } from './lib/demo'
 import { go, overlays, route, tripPath } from './lib/nav'
 import { Plan } from './screens/plan'
 import { startUpdates, setHomeCheck } from './lib/update'
 import { cursor, startSync } from './lib/sync'
 import { startBackground } from './lib/background'
+import { rescore } from './lib/score'
 
 // The sample trip lives in its own space and always starts fresh.
 if (DEMO && !trips.get()['demo-paris']) {
@@ -17,6 +18,8 @@ if (DEMO && !trips.get()['demo-paris']) {
   places.set(Object.fromEntries(ps.map((p) => [p.id, p])))
   settings.set({ ...settings.get(), me: 'Alex' })
 }
+// Scores from before "worth = the bars" are redone once (and sync to the other phone).
+for (const t of Object.values(trips.get())) { const re = rescore(t, tripPlaces(t.id)); if (re.length) save('place', re) }
 if (DEMO && !location.hash.replace(/^#\/?/, '')) go(tripPath('demo-paris'), true)
 
 // The family link (…/?k=KEY&api=SCRIPT_URL) is read once, kept on this phone, then hidden.

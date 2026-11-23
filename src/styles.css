@@ -61,7 +61,7 @@ svg { width: 22px; height: 22px; flex-shrink: 0; }
 .stack { display: flex; flex-direction: column; gap: 10px; }
 .between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 
-.tabbar { height: calc(var(--tabbar) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; }
+.tabbar { height: calc(var(--tabbar) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; }
 .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 13px; color: var(--muted); font-weight: 600; }
 .tab.on { color: var(--text); font-weight: 700; }
 .tab-icon { position: relative; display: flex; }
@@ -320,3 +320,32 @@ button.fact:disabled { opacity: 1; }
 .prow .when { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .prow .star { color: var(--gold-text, var(--gold)); }
 .decide-cta { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 16px; background: var(--surface); border: 1.5px solid var(--gold); }
+
+/* Ideas */
+.titlerow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.seg.mini { flex: 0 0 auto; padding: 3px; }
+.seg.mini button { min-height: 36px; padding: 0 14px; font-size: 15px; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; }
+.seg.mini svg { width: 16px; height: 16px; }
+.searchrow { display: flex; gap: 8px; align-items: center; }
+.searchrow > .pill { flex-shrink: 0; }
+.search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+.search svg { width: 18px; height: 18px; flex-shrink: 0; }
+.search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: inherit; font-size: 16px; color: var(--text); }
+.chipstrip { margin: 0 -16px; padding: 0 16px; }
+.chipstrip .pill { flex-shrink: 0; }
+.prow .meta .dot { width: 8px; height: 8px; margin-right: 2px; }
+
+/* Days: dates in one row, like Calendar */
+.datestrip { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 4px; scrollbar-width: none; }
+.datestrip::-webkit-scrollbar { display: none; }
+.datestrip.fit { display: grid; margin: 0; padding: 2px 0 4px; }
+.date { flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0 6px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); }
+.date .wd { font-size: 12px; font-weight: 600; color: var(--muted); }
+.date b { font-size: 20px; line-height: 1.1; }
+.date .dots { width: 6px; height: 6px; border-radius: 3px; background: transparent; }
+.date .dots.on { background: var(--gold); }
+.date.today { border-color: var(--gold); }
+.date.today .wd { color: var(--gold-text); }
+.date.past { opacity: .55; }
+.date.on { background: var(--primary); border-color: var(--primary); opacity: 1; }
+.date.on .wd, .date.on b { color: var(--on-primary); }

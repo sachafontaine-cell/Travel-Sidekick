@@ -29,7 +29,7 @@ export function Overlays({ trip }: { trip?: Trip }) {
         if (o.name === 'addday' && o.arg) return <AddToDaySheet trip={t} day={Number(o.arg)} />
         if (o.name === 'day' && o.arg) return <DaySheet trip={t} id={o.arg} />
         if (o.name === 'rules') return <RulesSheet trip={t} />
-        if (o.name === 'discover') return <DiscoverSheet trip={t} />
+        if (o.name === 'discover') return <DiscoverSheet trip={t} q={o.arg} />
         if (o.name === 'decide') return <Decide trip={t} />
         if (o.name === 'review') return <ReviewSheet trip={t} />
         return null

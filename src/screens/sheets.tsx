@@ -22,19 +22,18 @@ export const filters = createStore<Filters>({ sort: 'mine', hideTraps: true, kid
 export function FilterSheet({ trip }: { trip: Trip }) {
   const f = filters.use()
   const set = (p: Partial<Filters>) => filters.set({ ...f, ...p })
-  const sorts: [Filters['sort'], string][] = [['mine', 'My order'], ['worth', 'Worth it'], ['value', 'Value'], ['price', 'Price'], ['distance', 'Distance'], ['must', 'Must-see first']]
+  const sorts: [Filters['sort'], string][] = [['mine', 'Best first'], ['value', 'Best value'], ['price', 'Cheapest'], ['distance', 'Nearest home']]
   const cur = symbol(trip.dest.currency)
   return (
     <Sheet title="Sort & filter" foot={<button class="btn btn-quiet grow press" onClick={() => filters.set({ sort: 'mine', hideTraps: true, kids: false, near: false })}>Reset</button>}>
       <div class="stack"><span class="label">Sort</span><div class="chips">{sorts.map(([k, l]) => <button class={`pill press${f.sort === k ? ' on' : ''}`} aria-pressed={f.sort === k} onClick={() => set({ sort: k })}>{l}</button>)}</div>
-        {f.sort !== 'mine' && <p class="muted small">Drag to reorder works in "My order".</p>}</div>
+</div>
       <div class="stack"><span class="label">Show</span>
         <div class="chips">
           <button class={`pill press${f.hideTraps ? ' on' : ''}`} aria-pressed={f.hideTraps} onClick={() => set({ hideTraps: !f.hideTraps })}>Hide traps</button>
           {[20, 30, 50].map((n) => <button class={`pill press${f.under === n ? ' on' : ''}`} aria-pressed={f.under === n} onClick={() => set({ under: f.under === n ? undefined : n })}>Under {cur}{n}</button>)}
           <button class={`pill press${f.near ? ' on' : ''}`} aria-pressed={f.near} onClick={() => set({ near: !f.near })}>Near the hotel</button>
           <button class={`pill press${f.kids ? ' on' : ''}`} aria-pressed={f.kids} onClick={() => set({ kids: !f.kids })}>Kid-friendly</button>
-          <button class={`pill press${f.group !== false ? ' on' : ''}`} aria-pressed={f.group !== false} onClick={() => set({ group: f.group === false })}>Group by type</button>
         </div>
       </div>
     </Sheet>
@@ -117,8 +116,8 @@ const FOCUS: [string, string][] = [
 ]
 
 /** "Find more": Gemini searches Google for one focus and adds up to 8 new places, unchecked and tagged New. */
-export function DiscoverSheet({ trip }: { trip: Trip }) {
-  const [text, setText] = useState('')
+export function DiscoverSheet({ trip, q }: { trip: Trip; q?: string }) {
+  const [text, setText] = useState(q ?? '')
   const [state, setState] = useState<{ busy?: string; done?: string; err?: string }>({})
   const loc = here.use()
   useEffect(() => { void locate() }, [])

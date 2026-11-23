@@ -6,13 +6,15 @@ export type Route =
   | { name: 'trips' }
   | { name: 'today' | 'trip' | 'setup' | 'start'; trip: string }
   | { name: 'plan'; trip: string; day: number }
+  | { name: 'ideas'; trip: string; map: boolean }
 
 export function parse(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean)
   if (parts[0] === 't' && parts[1]) {
     const trip = decodeURIComponent(parts[1])
     const name = parts[2] ?? 'today'
-    if (name === 'plan') return { name: 'plan', trip, day: parts[3] === 'map' ? -1 : Number(parts[3]) || 0 }
+    if (name === 'plan') return parts[3] === 'map' ? { name: 'ideas', trip, map: true } : { name: 'plan', trip, day: Number(parts[3]) || 0 }
+    if (name === 'ideas') return { name: 'ideas', trip, map: parts[3] === 'map' }
     if (name === 'today' || name === 'trip' || name === 'setup' || name === 'start') return { name, trip }
   }
   return { name: 'trips' }

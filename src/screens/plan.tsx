@@ -1,230 +1,83 @@
-// Plan: "All" is the checklist (must-sees summary, every activity, Skipped); check what you want
-// and "Plan my days" fits it into the days. Each day chip shows that day's timeline.
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
-import { createStore } from '../lib/store'
-import { BadgeChip, Icon, Spinner, StateChip } from '../ui'
-import { refreshList, refreshing, stale } from '../lib/refresh'
-import { travelFrom } from '../lib/routes'
-import { here, locate } from '../lib/here'
-import { capacity, capacityText } from '../lib/capacity'
-import { queueFor } from './decide'
-import { days, nowIn, places, plansFor, save, settings, tripPlaces, trips } from '../lib/data'
+// Days: the trip as a calendar. Tap a date to see that day's timeline; one alert at most
+// (a must-see at risk, or wanted places not on a day yet). Choosing what to do is in Ideas.
+import { useEffect, useRef } from 'preact/hooks'
+import { Icon } from '../ui'
+import { days, nowIn, places, plansFor, tripPlaces, trips } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
-import { moveInDay, moveInList, pushDown, setDay, setStatus } from '../lib/actions'
+import { moveInDay, setDay } from '../lib/actions'
 import { startDrag, swipeable } from '../lib/gestures'
 import { countdown, mustInfo } from '../lib/musts'
-import { planChecked, planPending, rebalance } from '../lib/rebalance'
-import { dateOf, tripDays, type Slot } from '../lib/planner'
-import { clock, shortDate, WEEKDAY, weekday } from '../lib/time'
-import { short } from '../lib/money'
-import { km, leg, legText } from '../lib/geo'
-import { byRank } from '../lib/rank'
-import { groupOf, type Group } from '../lib/groups'
-import { filters, type Filters } from './sheets'
+import { dateOf, dayPlaces, tripDays, type Slot } from '../lib/planner'
+import { clock, WEEKDAY, WEEKDAY_LONG, weekday } from '../lib/time'
+import { legText } from '../lib/geo'
+import { fitWanted, pendingFor, unfitIds } from './ideas'
 import { TripBar } from './tripbar'
-import type { Place, Status, Trip } from '../lib/model'
+import type { Trip } from '../lib/model'
 
 export function Plan({ trip, day }: { trip: Trip; day: number }) {
-  places.use(); days.use(); trips.use()
+  places.use(); days.use(); trips.use(); unfitIds.use()
   const n = tripDays(trip)
   const now = nowIn(trip)
+  // Opens on today during the trip, else Day 1.
+  const sel = day >= 1 ? Math.min(day, n) : now.day >= 1 && now.day <= n ? now.day : 1
   return (
     <main class="main">
       <TripBar />
-      <h1 class="h1">Plan</h1>
-      <div class="strip" role="tablist" aria-label="Days">
-        <button role="tab" aria-selected={day === 0} class={`pill press${day === 0 ? ' on' : ''}`} onClick={() => go(tripPath(trip.id, 'plan'), true)}>List</button>
-        <button role="tab" aria-selected={day === -1} class={`pill press${day === -1 ? ' on' : ''}`} onClick={() => go(tripPath(trip.id, 'plan/map'), true)}><Icon.pin />Map</button>
-        {Array.from({ length: n }, (_, i) => i + 1).map((d) => {
-          const date = dateOf(trip, d)
-          return <button role="tab" aria-selected={day === d} class={`pill press${day === d ? ' on' : ''}`} onClick={() => go(tripPath(trip.id, `plan/${d}`), true)}>{d === now.day ? 'Today' : `D${d}`} <span style={{ fontWeight: 500, opacity: 0.8 }}>{WEEKDAY[weekday(date)]}</span></button>
-        })}
-      </div>
-      {day === -1 ? <MapLazy trip={trip} /> : day === 0 ? <All trip={trip} /> : <Day trip={trip} day={Math.min(day, n)} />}
+      <h1 class="h1">Days</h1>
+      <DateStrip trip={trip} sel={sel} />
+      <Alert trip={trip} />
+      <Day trip={trip} day={sel} />
     </main>
   )
 }
 
-/** The map and its library load only the first time Map is opened (keeps Plan fast). */
-let MapView: ((p: { trip: Trip }) => preact.JSX.Element) | null = null
-function MapLazy({ trip }: { trip: Trip }) {
-  const [, ready] = useState(!!MapView)
-  useEffect(() => { if (!MapView) void import('./map').then((m) => { MapView = m.MapView; ready(true) }) }, [])
-  return MapView ? <MapView trip={trip} /> : <div class="mapbox loading"><Spinner /></div>
-}
-
-function useRebalance(trip: Trip) {
+/** The trip's dates in one row, like Calendar: weekday, date, a dot when something's planned. */
+function DateStrip({ trip, sel }: { trip: Trip; sel: number }) {
+  const n = tripDays(trip)
   const now = nowIn(trip)
-  const all = tripPlaces(trip.id)
-  return useMemo(() => rebalance(trip, all, days.get(), now.day, now.min), [trip, places.get(), days.get()])
-}
-
-// ---- All
-
-function sortList(list: Place[], f: Filters, trip: Trip): Place[] {
-  const base = trip.base ?? trip.dest
-  const s = [...list]
-  if (f.sort === 'worth') s.sort((a, b) => b.worth - a.worth)
-  else if (f.sort === 'value') s.sort((a, b) => b.value - a.value)
-  else if (f.sort === 'price') s.sort((a, b) => a.price - b.price)
-  else if (f.sort === 'distance') s.sort((a, b) => km(base, a) - km(base, b))
-  else if (f.sort === 'must') s.sort((a, b) => Number(b.must) - Number(a.must) || byRank(a, b))
-  else s.sort(byRank)
-  return s.filter((p) => (!f.hideTraps || p.badge !== 'trap') && (!f.under || p.price <= f.under) && (!f.kids || p.sub.kid >= 7) && (!f.near || km(base, p) < 1.5))
-}
-
-function All({ trip }: { trip: Trip }) {
-  const f = filters.use()
-  here.use()
-  // Times on each row are from where you are now.
-  useEffect(() => { void locate() }, [])
-  const all = tripPlaces(trip.id)
-  const now = nowIn(trip)
-  const infos = mustInfo(trip, all, plansFor(trip), now.day, now.min)
-  const c = countdown(trip, infos, now.day)
-  const risky = infos.filter((i) => i.state !== 'done' && i.state !== 'scheduled')
-  const [showOut, setShowOut] = useState(false)
-  const list = sortList(all.filter((p) => p.status !== 'out'), f, trip)
-  const out = sortList(all.filter((p) => p.status === 'out'), { ...f, hideTraps: false }, trip)
-  const custom = f.sort !== 'mine' || f.hideTraps === false || f.under || f.kids || f.near
-  const ticked = list.filter((p) => p.status === 'picked').length
-  const toDecide = queueFor(trip, settings.get().me).length
-  const cap = capacity(trip, all)
-
-  const grouped = f.group !== false
-  return (
-    <>
-      <RefreshBanner trip={trip} />
-      {c.total > 0 && (risky.length > 0 ? (
-        <button class="banner press" onClick={() => open({ kind: 'rebalance' })}>
-          <span class="dot red" /><span class="grow"><b>Must-sees {c.done} of {c.total}</b> · {risky.length} at risk</span><span class="strong">Fix</span><Icon.chev />
-        </button>
-      ) : (
-        <div class="banner"><span class="dot" /><span class="grow"><b>Must-sees {c.done} of {c.total}</b> · all on a day</span></div>
-      ))}
-
-      {toDecide > 0 && (
-        <button class="decide-cta press" onClick={() => open({ kind: 'sheet', name: 'decide' })}>
-          <span class="grow stack" style={{ gap: '2px', textAlign: 'left' }}><b>Help me choose</b><span class="muted small">{toDecide} to look at, one at a time</span></span>
-          <Icon.chev />
-        </button>
-      )}
-      <div class="tools">
-        <button class="pill press" onClick={() => open({ kind: 'sheet', name: 'discover' })}><Icon.search />Find more</button>
-        <button class="pill press" onClick={() => open({ kind: 'sheet', name: 'review' })}><Icon.check />Check my list</button>
-      </div>
-
-      <div class="listhead">
-        <span class="grow stack" style={{ gap: '1px' }}><b>{ticked} wanted</b><span class={`small ${cap.left < -60 ? 'warn-text' : 'muted'}`}>{capacityText(cap)}</span></span>
-        <button class={`iconbtn ring press${custom ? ' on' : ''}`} aria-label="Sort & filter" onClick={() => open({ kind: 'sheet', name: 'filter' })}><Icon.filter /></button>
-        <button class="iconbtn ring press" aria-label="Add a place" onClick={() => open({ kind: 'sheet', name: 'add', arg: trip.id })}><Icon.plus /></button>
-      </div>
-      {!grouped ? <Section trip={trip} list={list} status="picked" draggable={f.sort === 'mine'} />
-        : GROUPS.map(([name, key]) => {
-          // Within a type: must-sees, then best first (unless sorted another way).
-          const g = list.filter((p) => groupOf(p) === key)
-          if (f.sort === 'mine') g.sort((a, b) => Number(!!a.done) - Number(!!b.done) || Number(b.must) - Number(a.must) || b.worth - a.worth)
-          return g.length ? <Section trip={trip} title={name} hint={`${g.filter((p) => p.status === 'picked').length} of ${g.length}`} list={g} status="picked" draggable={false} /> : null
-        })}
-      {list.length === 0 && <p class="muted small">Nothing here yet. Tap Find more.</p>}
-      {out.length > 0 && <button class="fold press" aria-expanded={showOut} onClick={() => setShowOut(!showOut)}>Skipped ({out.length}){showOut ? <Icon.up /> : <Icon.down />}</button>}
-      {showOut && <Section trip={trip} list={out} status="out" draggable={false} />}
-      <PlanBar trip={trip} />
-    </>
-  )
-}
-
-/** After the vibe, budget, group, pace or food changed: the list is being (or needs to be) re-scored. */
-function RefreshBanner({ trip }: { trip: Trip }) {
-  const r = refreshing.use()[trip.id]
-  if (r === 'busy') return <div class="banner"><Spinner /><span class="grow small">Updating suggestions for your new settings… (about 30 s)</span></div>
-  if (!stale(trip)) return null
-  return (
-    <div class="banner">
-      <span class="dot red" />
-      <span class="grow small">{r ? `Couldn't update: ${r}` : 'Trip settings changed: suggestions are out of date.'}</span>
-      <button class="btn btn-primary btn-sm press" onClick={() => void refreshList(trip.id)}>Update</button>
-    </div>
-  )
-}
-
-/** Type groups, in this order. */
-const GROUPS: [string, Group][] = [['Sights & landmarks', 'sight'], ['Museums', 'museum'], ['Outdoors & beaches', 'outdoors'], ['Tours & activities', 'tour'], ['Kids & animals', 'kids'], ['Shows & nightlife', 'show'], ['Food & drink', 'food'], ['Shopping & markets', 'shop'], ['Other', 'other']]
-
-/** Places that didn't fit the last time "Plan my days" ran (so the bar doesn't nag about them). */
-const unfitIds = createStore<string[]>([])
-
-/** Sticky at the bottom whenever the checks and the days disagree. */
-function PlanBar({ trip }: { trip: Trip }) {
-  const unfit = unfitIds.use()
-  const now = nowIn(trip)
-  const fromDay = now.day >= 1 ? now.day + 1 : 1
-  if (fromDay > tripDays(trip)) return null
-  const all = tripPlaces(trip.id)
-  const { add, remove } = planPending(all, fromDay)
-  const fresh = add.filter((p) => !unfit.includes(p.id))
-  if (!fresh.length && !remove.length) {
-    return add.length ? <p class="muted small tcenter">{add.length} checked {add.length === 1 ? "doesn't" : "don't"} fit the days: {add.map((p) => p.name).join(', ')}.</p> : null
-  }
-  const run = () => {
-    const r = planChecked(trip, all, days.get(), fromDay)
-    unfitIds.set(r.unfit.map((p) => p.id))
-    const parts = [r.added && `${r.added} added`, r.removed && `${r.removed} removed`, r.unfit.length && `${r.unfit.length} didn't fit`].filter(Boolean)
-    save('place', r.places, `Days planned${parts.length ? ` · ${parts.join(' · ')}` : ''}`)
-  }
-  const what = [fresh.length && `${fresh.length} to add`, remove.length && `${remove.length} to remove`].filter(Boolean).join(' · ')
-  return (
-    <div class="planbar">
-      <button class="btn btn-primary grow press" onClick={run}><Icon.plan />Plan my days</button>
-      <span class="small">{what}{now.day >= 1 ? ' · from tomorrow' : ''}</span>
-    </div>
-  )
-}
-
-function Section({ trip, title, hint, list, status, draggable }: { trip: Trip; title?: string; hint?: string; list: Place[]; status: Status; draggable: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
-  if (!list.length) return null
+  const list = tripPlaces(trip.id)
+  useEffect(() => { ref.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ inline: 'center', block: 'nearest' }) }, [sel])
   return (
-    <div class="section">
-      {title && <div class="section-h"><span class="h3">{title}</span>{hint && <span class="muted small">{hint}</span>}</div>}
-      {(
-        <div class="list" ref={ref}>
-          {list.map((p, i) => <Row trip={trip} p={p} draggable={draggable} onGrip={(e) => ref.current && startDrag(e, ref.current, i, (from, to) => {
-            const rest = list.filter((_, k) => k !== from)
-            moveInList(list[from].id, rest[to - 1], rest[to])
-          })} />)}
-        </div>
-      )}
+    <div class={`datestrip${n <= 7 ? ' fit' : ''}`} role="tablist" aria-label="Days" ref={ref} style={n <= 7 ? { gridTemplateColumns: `repeat(${n}, 1fr)` } : undefined}>
+      {Array.from({ length: n }, (_, i) => i + 1).map((d) => {
+        const date = dateOf(trip, d)
+        const stops = dayPlaces(list, d).length
+        return (
+          <button role="tab" aria-selected={d === sel} aria-label={`Day ${d}, ${WEEKDAY_LONG[weekday(date)]} ${Number(date.slice(8))}${d === now.day ? ', today' : ''}`}
+            class={`date press${d === sel ? ' on' : ''}${d === now.day ? ' today' : ''}${d < now.day ? ' past' : ''}`} onClick={() => go(tripPath(trip.id, `plan/${d}`), true)}>
+            <span class="wd">{d === now.day ? 'Today' : WEEKDAY[weekday(date)]}</span>
+            <b class="num">{Number(date.slice(8))}</b>
+            <span class={`dots${stops ? ' on' : ''}`} />
+          </button>
+        )
+      })}
     </div>
   )
 }
 
-/** The checkbox: checked = want it. ↺ on a skipped place brings it back. Swipe ← skips, → checks. */
-export function Tick({ p }: { p: Place }) {
-  const on = p.status === 'picked'
-  const act = () => setStatus(p.id, on ? 'maybe' : p.status === 'out' ? 'maybe' : 'picked')
-  if (p.status === 'out') return <button class="tick out press" aria-label={`Bring back ${p.name}`} onClick={act}><span><Icon.refresh /></span></button>
-  return <button class={`tick press${on ? ' on' : ''}`} role="checkbox" aria-checked={on} aria-label={p.name} onClick={act}><span>{on ? <Icon.check /> : null}</span></button>
-}
-
-function Row({ trip, p, draggable, onGrip }: { trip: Trip; p: Place; draggable: boolean; onGrip: (e: PointerEvent) => void }) {
-  const left = p.status === 'out' ? undefined : () => (p.must ? pushDown(p.id) : setStatus(p.id, 'out'))
-  const right = p.status === 'picked' ? undefined : () => setStatus(p.id, p.status === 'out' ? 'maybe' : 'picked')
-  const sw = swipeable(left, right)
-  const pt = here.get().pt
-  const t = !p.booked && pt ? travelFrom(trip, p, pt) : null
-  const unfit = p.status === 'picked' && p.day == null && unfitIds.get().includes(p.id)
-  return (
-    <div class={`prow${p.done ? ' done' : ''}`} data-drag data-left={p.must ? 'To the bottom' : 'Skip'} data-right={p.status === 'out' ? 'Bring back' : 'Want'} {...sw}>
-      <Tick p={p} />
-      <button class="open press" onClick={() => open({ kind: 'card', place: p.id })}>
-        <span class="line1">{p.must && <span class="star" aria-label="Must-see">★</span>}<span class="name">{p.name}</span>{p.day ? <span class="when">{p.done ? 'Done' : `Day ${p.day}`}</span> : unfit ? <span class="when warn-text">No room</span> : null}</span>
-        <span class="meta">{p.fresh && <span class="chip ok">New</span>}{p.badge === 'trap' && <span class="chip trap">Trap</span>}{p.scoring ? 'Scoring…' : `${p.worth}/10 · ${short(trip, p.price)}${t ? ` · ${t.real ? '' : '≈'}${legText(t)}` : ''}`}</span>
-      </button>
-      {draggable && <span class="handle" role="button" aria-label={`Drag to reorder ${p.name}`} onPointerDown={(e) => onGrip(e as unknown as PointerEvent)}><Icon.grip /></span>}
+/** One thing at most: a must-see at risk first, else wanted places that aren't on a day. */
+function Alert({ trip }: { trip: Trip }) {
+  const now = nowIn(trip)
+  const infos = mustInfo(trip, tripPlaces(trip.id), plansFor(trip), now.day, now.min)
+  const c = countdown(trip, infos, now.day)
+  if (c.atRisk) return (
+    <button class="banner press" onClick={() => open({ kind: 'rebalance' })}>
+      <span class="dot red" /><span class="grow"><b>{c.atRisk} must-see{c.atRisk > 1 ? 's' : ''} at risk</b> · {c.done} of {c.total} done</span><span class="strong">Fix</span><Icon.chev />
+    </button>
+  )
+  const pend = pendingFor(trip)
+  if (pend && (pend.add.length || pend.remove.length)) return (
+    <div class="banner">
+      <span class="dot" /><span class="grow small">{pend.add.length ? `${pend.add.length} wanted place${pend.add.length > 1 ? 's aren\'t' : ' isn\'t'} on a day yet` : `${pend.remove.length} place${pend.remove.length > 1 ? 's' : ''} you don't want any more`}</span>
+      <button class="btn btn-primary btn-sm press" onClick={() => fitWanted(trip)}>{pend.add.length ? 'Fit in' : 'Take off'}</button>
     </div>
   )
+  return null
 }
+
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 // ---- One day
 
@@ -232,7 +85,6 @@ function Day({ trip, day }: { trip: Trip; day: number }) {
   const plan = plansFor(trip)[day - 1]
   const now = nowIn(trip)
   const ref = useRef<HTMLDivElement>(null)
-  const prop = useRebalance(trip)
   const date = dateOf(trip, day)
   if (!plan) return null
   const slots = plan.slots
@@ -248,17 +100,17 @@ function Day({ trip, day }: { trip: Trip; day: number }) {
   }
   return (
     <>
-      <div class="between"><span class="strong">{WEEKDAY[weekday(date)]} {shortDate(date)}{day === now.day ? ' · today' : ''}</span><span class="muted small">Walking {plan.walkMi} of {plan.limitMi} mi</span></div>
+      <div class="between"><span class="h3">{WEEKDAY_LONG[weekday(date)]} {Number(date.slice(8))} {MONTHS[Number(date.slice(5, 7)) - 1]}</span><span class="muted small">Day {day} · walking {plan.walkMi} of {plan.limitMi} mi</span></div>
       {near && <div class="bar" aria-hidden="true"><span style={{ width: `${Math.min(100, (plan.walkMi / plan.limitMi) * 100)}%`, background: plan.over ? 'var(--danger)' : undefined }} /></div>}
-      {(plan.issues.length > 0 || prop.changes.length > 0) && day >= fixFrom - 1 && (
+      {plan.issues.length > 0 && day >= fixFrom - 1 && (
         <div class="banner">
           <span class="dot red" />
-          <span class="grow small">{plan.issues[0] ?? `${prop.changes.length} change${prop.changes.length > 1 ? 's' : ''} would keep the days balanced`}</span>
+          <span class="grow small">{plan.issues[0]}</span>
           <button class="btn btn-quiet btn-sm press" onClick={() => open({ kind: 'rebalance' })}>Review</button>
         </div>
       )}
       {slots.length === 0 ? (
-        <div class="empty"><p>Nothing planned yet.</p></div>
+        <div class="empty"><p>Nothing planned yet.</p><button class="btn btn-secondary press" onClick={() => go(tripPath(trip.id, 'ideas'), true)}>Choose from your ideas</button></div>
       ) : (
         <div class="list" ref={ref}>
           {slots.map((s, i) => <SlotRow trip={trip} s={s} first={i === 0} past={day < now.day || (day === now.day && s.end <= now.min)} onGrip={(e) => ref.current && startDrag(e, ref.current, i, dropAt)} />)}
@@ -286,4 +138,3 @@ function SlotRow({ trip, s, first, past, onGrip }: { trip: Trip; s: Slot; first:
     </div>
   )
 }
-void trips

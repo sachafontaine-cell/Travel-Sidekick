@@ -101,27 +101,21 @@ await test('sample trip: the Card is a dialog; X and a tap outside close it; the
   await p.context().close()
 })
 
-await test('sample trip: drag reorders the list; swipe skips (with Undo)', async () => {
+await test('sample trip: Ideas: type chips and search narrow the list; swipe skips (with Undo)', async () => {
   const p = await page()
-  await p.goto(BASE + '?demo#/t/demo-paris/plan')
-  // Drag to reorder works in the flat list (Filter → Group by type off).
-  await p.getByRole('button', { name: 'Sort & filter' }).click()
-  await p.getByRole('button', { name: 'Group by type' }).click()
-  await p.keyboard.press('Escape')
-  await p.getByRole('button', { name: /^Drag to reorder/ }).first().waitFor()
-  const names = () => p.locator('.section').first().locator('.prow .name').allInnerTexts()
-  const before = await names()
-  await p.evaluate(() => document.querySelector('.main').scrollBy(0, 400))
-  await p.waitForTimeout(150)
-  const h = await p.getByRole('button', { name: `Drag to reorder ${before[0]}` }).boundingBox()
-  await p.mouse.move(h.x + h.width / 2, h.y + h.height / 2)
-  await p.mouse.down()
-  for (let i = 1; i <= 20; i++) await p.mouse.move(h.x + h.width / 2, h.y + h.height / 2 + i * 12)
-  await p.mouse.up()
-  await p.waitForTimeout(200)
-  const after = await names()
-  expect(after[0] !== before[0] && after.includes(before[0]), `first row moved down (${after.slice(0, 3)})`)
-  const maybe = p.locator('.section').first().locator('.prow').filter({ hasNot: p.locator('.star') }).nth(1)
+  await p.goto(BASE + '?demo#/t/demo-paris/ideas')
+  const names = () => p.locator('.prow .name').allInnerTexts()
+  const all = (await names()).length
+  await p.getByRole('button', { name: /^Museums/ }).click()
+  const museums = await names()
+  expect(museums.length > 0 && museums.length < all && museums.includes("Musée d'Orsay"), `the Museums chip shows museums (${museums})`)
+  await p.getByRole('button', { name: /^All \d+$/ }).click()
+  await p.getByLabel('Search your ideas').fill('eiffel')
+  expect((await names()).join() === 'Eiffel Tower', 'search finds it')
+  await p.getByLabel('Search your ideas').fill('turtle')
+  await p.getByRole('button', { name: 'Search Google for "turtle"' }).waitFor()
+  await p.getByLabel('Search your ideas').fill('')
+  const maybe = p.locator('.prow').filter({ hasNot: p.locator('.star') }).nth(1)
   await maybe.evaluate((e) => e.scrollIntoView({ block: 'center' }))
   await p.waitForTimeout(150)
   const name = await maybe.locator('.name').innerText()
@@ -133,13 +127,15 @@ await test('sample trip: drag reorders the list; swipe skips (with Undo)', async
   await p.getByText(`${name} skipped`).waitFor()
   await p.getByRole('button', { name: 'Undo' }).click()
   await p.waitForTimeout(150)
-  expect((await p.locator('.section').first().locator('.prow .name').allInnerTexts()).includes(name), 'Undo brings it back')
+  expect((await names()).includes(name), 'Undo brings it back')
+  expect(p.errors.length === 0, 'no console errors: ' + p.errors.join(' | '))
+  await p.screenshot({ path: `${SHOTS}/ideas.png` })
   await p.context().close()
 })
 
 await test('sample trip: checklist + Plan my days; Card Want it · Maybe · Skip; Add to this day', async () => {
   const p = await page()
-  await p.goto(BASE + '?demo#/t/demo-paris/plan')
+  await p.goto(BASE + '?demo#/t/demo-paris/ideas')
   const box = p.locator('.prow [role=checkbox][aria-checked=false]').first()
   const name = await box.getAttribute('aria-label')
   await box.click()
@@ -188,7 +184,7 @@ await test('sample trip: set your own start time on the Card; Auto gives it back
 
 await test('sample trip: Decide one by one: Want, Undo, Skip; room left', async () => {
   const p = await page()
-  await p.goto(BASE + '?demo#/t/demo-paris/plan')
+  await p.goto(BASE + '?demo#/t/demo-paris/ideas')
   await p.getByText(/Room for about|days are about full|more than your days hold/).first().waitFor()
   await p.getByRole('button', { name: /Help me choose/ }).click()
   const d = p.getByRole('dialog')
@@ -217,7 +213,7 @@ await test('sample trip: Decide one by one: Want, Undo, Skip; room left', async 
 
 await test('sample trip: Map: filter first, then pins; a pin opens a summary and the card', async () => {
   const p = await page()
-  await p.goto(BASE + '?demo#/t/demo-paris/plan')
+  await p.goto(BASE + '?demo#/t/demo-paris/ideas')
   await p.getByRole('tab', { name: /Map/ }).click()
   const pins = p.locator('.leaflet-marker-icon .pin:not(.home)')
   // Filters first: the map stays hidden until "Show … on the map".
@@ -294,7 +290,7 @@ await test('photos: the Eiffel Tower card shows its official photo; a restaurant
 
 await test('dark mode renders with no errors', async () => {
   const p = await page({ colorScheme: 'dark' })
-  await p.goto(BASE + '?demo#/t/demo-paris/plan')
+  await p.goto(BASE + '?demo#/t/demo-paris/ideas')
   await p.getByText(/^\d+ wanted$/).first().waitFor()
   const bg = await p.evaluate(() => getComputedStyle(document.body).backgroundColor)
   expect(bg === 'rgb(14, 23, 41)', 'dark background ' + bg)
@@ -397,7 +393,7 @@ await test('new trip: setup, key, build the list (streamed), confirm must-sees, 
   expect(saved.some((x) => x.name === 'Jardin des Plantes'), 'a real place from OpenStreetMap that Gemini judged worth it')
   expect(saved.filter((x) => x.name === 'Eiffel Tower').length === 1, 'no duplicates across searches')
   // Change the vibe: leaving Setup re-scores the list and adds a better fit, keeping our choices.
-  await p.evaluate(() => { location.hash = location.hash.replace(/\/plan.*$/, '/setup') })
+  await p.evaluate(() => { location.hash = location.hash.replace(/\/(plan|ideas).*$/, '/setup') })
   await p.getByRole('button', { name: /Vibe/ }).click()
   await p.getByRole('button', { name: 'More Family' }).click()
   await p.keyboard.press('Escape')
@@ -410,6 +406,7 @@ await test('new trip: setup, key, build the list (streamed), confirm must-sees, 
   expect(after.find((x) => x.name === 'Louvre').must === false, 'must-see choice kept')
   const jp = after.find((x) => x.name === 'Parc Monceau')
   expect(jp && jp.status === 'maybe' && jp.fresh, 'new fit added, unchecked, tagged New')
+  await p.locator('.tabbar').getByRole('button', { name: 'Ideas' }).click()
   await p.getByText('New', { exact: true }).first().waitFor()
   // Find more: type what we're after; it comes back unchecked, tagged New.
   await p.getByRole('button', { name: 'Find more' }).click()
@@ -466,7 +463,7 @@ await test('speed: first screen < 1 s and screens switch < 150 ms (CPU 4× slowe
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)))
     return performance.now() - t0
   }, name)
-  const times = { plan: await tap('Plan'), today: await tap('Today'), plan2: await tap('Plan') }
+  const times = { ideas: await tap('Ideas'), days: await tap('Days'), today: await tap('Today'), ideas2: await tap('Ideas') }
   console.log(`   first paint ${Math.round(first)} ms; tab switches ${Object.values(times).map((x) => Math.round(x)).join(', ')} ms`)
   expect(first < 1000, `first paint ${Math.round(first)} ms`)
   expect(Math.max(...Object.values(times)) < 150, `tab switch ${JSON.stringify(times)}`)

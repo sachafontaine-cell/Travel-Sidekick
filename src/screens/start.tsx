@@ -82,7 +82,7 @@ export function Start({ trip }: { trip: Trip }) {
     save('place', final)
     save('trip', [{ ...trips.get()[trip.id], built: true, listFor: listKey(trips.get()[trip.id]) }])
     void locateAll(trips.get()[trip.id]).catch(() => {})
-    go(tripPath(trip.id, 'plan'), true)
+    go(tripPath(trip.id, 'ideas'), true)
   }
 
   return (

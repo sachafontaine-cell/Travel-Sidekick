@@ -158,3 +158,57 @@ describe('bookings from email', () => {
     expect(plan.slots.find((s) => s.place?.name === 'Arc de Triomphe')!.start).toBeLessThan(14 * 60)
   })
 })
+
+describe('bookings are anchors: the day stays in time order', () => {
+  const { trip, places } = demoTrip()
+  // A Cabo-like day: one stop in the morning, a 13:00 snorkel booking, lunch and a long downtime.
+  const t = { ...trip, downtime: { on: true, minutes: 150 } }
+  const near = { lat: trip.base!.lat + 0.01, lng: trip.base!.lng }
+  const morning = { ...places[0], id: 'm', name: 'Acre Baja', ...near, day: 4, dayRank: 'a', fixed: null, booked: undefined, hours: undefined, minutes: 120, kind: 'sight' as const }
+  const snorkel = { ...places[0], id: 's', name: 'Santa Maria Bay Snorkeling', lat: near.lat + 0.01, lng: near.lng, day: 4, dayRank: 'z', fixed: 13 * 60, booked: 'Booked', hours: undefined, minutes: 180, kind: 'tour' as const }
+  const plan = planDay(t, 4, [morning, snorkel])
+  it('lists everything in time order, nothing overlapping', () => {
+    const starts = plan.slots.map((s) => s.start)
+    expect([...starts].sort((a, b) => a - b)).toEqual(starts)
+    for (let i = 1; i < plan.slots.length; i++) expect(plan.slots[i].start).toBeGreaterThanOrEqual(plan.slots[i - 1].end)
+  })
+  it('keeps the booking at its time, on time', () => {
+    const s = plan.slots.find((x) => x.id === 's')!
+    expect(clock(s.start)).toBe('13:00')
+    expect(s.warn).toBeUndefined()
+  })
+  it('fits lunch and downtime around the booking, not across it', () => {
+    const s = plan.slots.find((x) => x.id === 's')!
+    for (const k of ['lunch', 'downtime']) {
+      const x = plan.slots.find((y) => y.kind === k)
+      if (x) expect(x.end <= s.start || x.start >= s.end).toBe(true)
+    }
+  })
+})
+
+describe('planner never goes back in time (random days)', () => {
+  it('3000 random days: times always go forward; overlaps only between clashing bookings', () => {
+    const { trip, places } = demoTrip()
+    let seed = 7
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    const bad: string[] = []
+    for (let k = 0; k < 3000; k++) {
+      const n = 1 + Math.floor(rnd() * 6)
+      const day = places.slice(0, 12).sort(() => rnd() - 0.5).slice(0, n).map((p, i) => ({
+        ...p, id: `r${i}`, day: 2, dayRank: String.fromCharCode(97 + Math.floor(rnd() * 26)) + i,
+        fixed: rnd() < 0.35 ? (8 + Math.floor(rnd() * 12)) * 60 + (rnd() < 0.5 ? 30 : 0) : null,
+        booked: undefined, done: false, minutes: 30 + Math.floor(rnd() * 8) * 15,
+        lat: trip.dest.lat + (rnd() - 0.5) * 0.1, lng: trip.dest.lng + (rnd() - 0.5) * 0.1,
+      }))
+      const t = { ...trip, downtime: { on: rnd() < 0.6, minutes: 60 + Math.floor(rnd() * 4) * 30 } }
+      const plan = planDay(t, 2, day)
+      for (let i = 1; i < plan.slots.length; i++) {
+        const a = plan.slots[i - 1], b = plan.slots[i]
+        const clash = b.place?.fixed != null && b.warn?.includes('late for the booking')
+        if (b.start < a.start || (b.start < a.end && !clash)) bad.push(`${clock(a.start)}-${clock(a.end)} ${a.id} then ${clock(b.start)} ${b.id}`)
+      }
+      for (const s of plan.slots) if (s.place?.fixed != null && s.start !== s.place.fixed) bad.push(`booking moved ${s.id}`)
+    }
+    expect(bad.slice(0, 5)).toEqual([])
+  })
+})

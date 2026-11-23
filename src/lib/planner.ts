@@ -71,76 +71,124 @@ export function planDay(trip: Trip, day: number, all: Place[], meta?: DayMeta): 
   const slots: Slot[] = []
   let pos: Point | undefined = base
   let walkKm = 0
+  // Far from the destination (the flight from home, a hotel booked elsewhere): it keeps its time
+  // on the day, but adds no travel or walking and doesn't move where you are.
+  const far = (p: Point) => trip.dest.lat !== 0 && km(trip.dest, p) > FAR_KM
+  const NO_TRAVEL: Leg = { minutes: 0, walkKm: 0, mode: 'walk', km: 0 }
+  const trip_ = (from: Point | undefined, to: Place) => (far(to) ? NO_TRAVEL : leg(from, to, kids))
+
+  // Bookings and times you set are anchors: everything else fits around them, in your order.
+  const anchors = list.filter((p) => p.fixed != null).sort((a, b) => a.fixed! - b.fixed!)
   let cursor = trip.dayStart
   // A booking before the usual start pulls the day earlier.
-  if (list[0]?.fixed != null) cursor = Math.min(cursor, list[0].fixed - (trip.dest.lat !== 0 && km(trip.dest, list[0]) > FAR_KM ? 0 : leg(pos, list[0], kids).minutes))
+  if (anchors[0] && anchors[0].fixed! < cursor) cursor = Math.max(0, anchors[0].fixed! - trip_(pos, anchors[0]).minutes)
 
   let lunchDone = false
   const wantDowntime = trip.downtime.on && trip.downtime.minutes > 0
   let downtimeDone = !wantDowntime
   const after = meta?.downtimeAfter
   const afterKnown = after === '^' || after === 'lunch' || (!!after && list.some((p) => p.id === after))
+  const round5 = (m: number) => Math.ceil(m / 5) * 5
 
-  const addDowntime = () => {
+  /** Would something from `start` to `end`, ending at `at`, still leave time to reach the next anchor? */
+  const fits = (end: number, at: Point | undefined) => {
+    const next = anchors[0]
+    return !next || end + trip_(at, next).minutes <= next.fixed! + 5
+  }
+  const placeAnchor = () => {
+    const p = anchors.shift()
+    if (!p) return
+    const travel = trip_(pos, p)
+    const arrive = cursor + travel.minutes
+    const start = p.fixed!
+    const warn = arrive > start + 5 ? `About ${arrive - start} min late for the booking` : undefined
+    slots.push({ kind: 'place', id: p.id, place: p, start, end: start + p.minutes, travel, warn, wait: Math.max(0, start - arrive) || undefined })
+    walkKm += travel.walkKm
+    if (!far(p)) pos = p
+    cursor = Math.max(cursor, start + p.minutes)
+    if (p.kind === 'meal' && start >= LUNCH[0] && start < LUNCH[1]) lunchDone = true
+    maybeDowntime(p.id)
+  }
+  /** Places anchors until `end` (ending at `at`) fits before the next one. */
+  const makeRoom = (plan: () => { end: number; at: Point | undefined }) => { while (anchors.length && !fits(plan().end, plan().at)) placeAnchor() }
+
+  function addDowntime() {
+    makeRoom(() => { const t = leg(pos, base, kids); const s0 = round5(cursor + t.minutes); return { end: s0 + trip.downtime.minutes, at: base } })
     const travel = leg(pos, base, kids)
-    const start = Math.ceil((cursor + travel.minutes) / 5) * 5
+    const start = round5(cursor + travel.minutes)
     slots.push({ kind: 'downtime', id: 'downtime', start, end: start + trip.downtime.minutes, travel })
     walkKm += travel.walkKm
     if (base) pos = base
     cursor = start + trip.downtime.minutes
     downtimeDone = true
   }
-  const maybeDowntime = (lastId: string) => {
+  function maybeDowntime(lastId: string) {
     if (downtimeDone) return
     if (afterKnown ? after === lastId : lunchDone && cursor >= 12 * 60 + 30 && cursor < 17 * 60) addDowntime()
   }
   const addLunch = () => {
-    const start = Math.ceil(Math.max(cursor, 12 * 60) / 5) * 5
-    slots.push({ kind: 'lunch', id: 'lunch', start, end: start + LUNCH_MIN, travel: { minutes: 0, walkKm: 0, mode: 'walk', km: 0 }, wait: start - cursor || undefined })
+    makeRoom(() => ({ end: round5(Math.max(cursor, 12 * 60)) + LUNCH_MIN, at: pos }))
+    if (lunchDone) return
+    const start = round5(Math.max(cursor, 12 * 60))
+    slots.push({ kind: 'lunch', id: 'lunch', start, end: start + LUNCH_MIN, travel: NO_TRAVEL, wait: start - cursor || undefined })
     cursor = start + LUNCH_MIN
     lunchDone = true
     maybeDowntime('lunch')
   }
+  const lunchTime = () => !lunchDone && cursor >= 12 * 60 + 15 && cursor < LUNCH[1]
+
+  /** When a flexible stop would start (opening hours, meal times) and any warning. */
+  const timing = (p: Place) => {
+    const travel = trip_(pos, p)
+    const arrive = cursor + travel.minutes
+    let start = round5(arrive)
+    let warn: string | undefined
+    const h = hoursOn(p, date)
+    if (p.kind === 'meal') {
+      if (arrive < LUNCH[0]) start = LUNCH[0]
+      else if (arrive > LUNCH[1] - 30 && arrive < DINNER_FROM) start = DINNER_FROM
+    }
+    if (h === null) warn = `Closed on ${WEEKDAY_LONG[weekday(date)]}s`
+    else if (h) {
+      if (start < h[0]) start = h[0]
+      if (start >= h[1]) warn = `Closed by then (closes ${clock(h[1])})`
+      else if (start + p.minutes > h[1] + 10) warn = `Closes at ${clock(h[1])}`
+    }
+    return { travel, arrive, start, warn }
+  }
 
   if (after === '^' && wantDowntime && list.length) addDowntime()
 
-  // Far from the destination (the flight from home, a hotel booked elsewhere): it keeps its time
-  // on the day, but adds no travel or walking and doesn't move where you are.
-  const far = (p: Point) => trip.dest.lat !== 0 && km(trip.dest, p) > FAR_KM
+  // Your order, kept where time allows: a booking is placed when its turn comes (with any earlier
+  // bookings first); a stop that would make you late for the next booking goes after it instead.
   for (const p of list) {
-    // No meal coming and it's lunchtime: keep a lunch break before going on.
-    if (!lunchDone && p.kind !== 'meal' && cursor >= 12 * 60 + 15 && cursor < LUNCH[1]) addLunch()
-    const away = far(p)
-    const travel = away ? { minutes: 0, walkKm: 0, mode: 'walk' as const, km: 0 } : leg(pos, p, kids)
-    const arrive = cursor + travel.minutes
-    // Calm, round times: stops start on the next 5 minutes (10:50, not 10:47).
-    let start = Math.ceil(arrive / 5) * 5
-    let warn: string | undefined
-    const h = hoursOn(p, date)
     if (p.fixed != null) {
-      start = p.fixed
-      if (arrive > p.fixed + 5) warn = `About ${arrive - p.fixed} min late for the booking`
-    } else {
-      if (p.kind === 'meal') {
-        if (arrive < LUNCH[0]) start = LUNCH[0]
-        else if (arrive > LUNCH[1] - 30 && arrive < DINNER_FROM) start = DINNER_FROM
+      if (!anchors.includes(p)) continue
+      while (anchors.length && anchors[0].fixed! <= p.fixed) {
+        // Lunch first when it fits before this booking (lunch can bring downtime, which can place bookings: look again).
+        if (lunchTime() && anchors[0].kind !== 'meal' && fits(round5(Math.max(cursor, 12 * 60)) + LUNCH_MIN, pos)) { addLunch(); continue }
+        placeAnchor()
       }
-      if (h === null) warn = `Closed on ${WEEKDAY_LONG[weekday(date)]}s`
-      else if (h) {
-        if (start < h[0]) start = h[0]
-        if (start >= h[1]) warn = `Closed by then (closes ${clock(h[1])})`
-        else if (start + p.minutes > h[1] + 10) warn = `Closes at ${clock(h[1])}`
-      }
+      continue
     }
-    const wait = Math.max(0, start - arrive)
-    slots.push({ kind: 'place', id: p.id, place: p, start, end: start + p.minutes, travel, warn, wait: wait || undefined })
+    // No meal coming and it's lunchtime: keep a lunch break before going on.
+    if (p.kind !== 'meal' && lunchTime()) addLunch()
+    makeRoom(() => { const t = timing(p); return { end: t.start + p.minutes, at: far(p) ? pos : p } })
+    if (p.kind !== 'meal' && lunchTime()) addLunch()
+    const { travel, arrive, start, warn } = timing(p)
+    slots.push({ kind: 'place', id: p.id, place: p, start, end: start + p.minutes, travel, warn, wait: Math.max(0, start - arrive) || undefined })
     walkKm += travel.walkKm
-    if (!away) pos = p
+    if (!far(p)) pos = p
     cursor = start + p.minutes
     if (p.kind === 'meal' && start >= LUNCH[0] && start < LUNCH[1]) lunchDone = true
     maybeDowntime(p.id)
   }
-  if (list.length && !lunchDone && cursor >= 12 * 60 + 15 && cursor < LUNCH[1]) addLunch()
+  // Bookings after everything else, with lunch and downtime still fitted in their gaps.
+  while (anchors.length) {
+    if (lunchTime() && anchors[0].kind !== 'meal' && fits(round5(Math.max(cursor, 12 * 60)) + LUNCH_MIN, pos)) { addLunch(); continue }
+    placeAnchor()
+  }
+  if (list.length && lunchTime()) addLunch()
   if (list.length && base) walkKm += leg(pos, base, kids).walkKm
 
   const limit = groupLimit(trip).miles

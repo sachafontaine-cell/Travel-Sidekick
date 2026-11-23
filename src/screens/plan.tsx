@@ -123,7 +123,9 @@ function Day({ trip, day }: { trip: Trip; day: number }) {
 }
 
 function SlotRow({ trip, s, first, past, onGrip }: { trip: Trip; s: Slot; first: boolean; past: boolean; onGrip: (e: PointerEvent) => void }) {
-  const sw = swipeable(s.place ? () => setDay(s.id, null) : undefined)
+  // Bookings stay put: no swipe off the day, no drag (their time is fixed).
+  const booked = !!s.place?.booked
+  const sw = swipeable(s.place && !booked ? () => setDay(s.id, null) : undefined)
   const travel = !first && s.travel.minutes > 0 ? legText(s.travel) : ''
   const name = s.place?.name ?? (s.kind === 'downtime' ? `Downtime · ${s.end - s.start} min` : 'Lunch (pick a spot nearby)')
   const sub = s.warn ?? (s.place?.booked ?? (s.kind === 'downtime' ? (trip.base ? `At ${trip.base.name}` : 'Rest nearby') : s.place ? `Worth ${s.place.worth}${s.wait && s.wait >= 15 ? ` · ${s.wait} min free before` : ''}` : ''))
@@ -134,7 +136,7 @@ function SlotRow({ trip, s, first, past, onGrip }: { trip: Trip; s: Slot; first:
         <span class="name strong">{name}</span>
         <span class={`small ${s.warn ? 'warn' : 'muted'}`}>{travel ? `${travel} · ` : ''}{sub}</span>
       </button>
-      {s.kind !== 'lunch' && <span class="handle" role="button" aria-label={`Drag to move ${name}`} onPointerDown={(e) => onGrip(e as unknown as PointerEvent)}><Icon.grip /></span>}
+      {s.kind !== 'lunch' && !booked && <span class="handle" role="button" aria-label={`Drag to move ${name}`} onPointerDown={(e) => onGrip(e as unknown as PointerEvent)}><Icon.grip /></span>}
     </div>
   )
 }

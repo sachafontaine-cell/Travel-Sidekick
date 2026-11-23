@@ -83,7 +83,7 @@ export function planDay(trip: Trip, day: number, all: Place[], meta?: DayMeta): 
 
   const addDowntime = () => {
     const travel = leg(pos, base, kids)
-    const start = cursor + travel.minutes
+    const start = Math.ceil((cursor + travel.minutes) / 5) * 5
     slots.push({ kind: 'downtime', id: 'downtime', start, end: start + trip.downtime.minutes, travel })
     walkKm += travel.walkKm
     if (base) pos = base
@@ -95,7 +95,7 @@ export function planDay(trip: Trip, day: number, all: Place[], meta?: DayMeta): 
     if (afterKnown ? after === lastId : lunchDone && cursor >= 12 * 60 + 30 && cursor < 17 * 60) addDowntime()
   }
   const addLunch = () => {
-    const start = Math.max(cursor, 12 * 60)
+    const start = Math.ceil(Math.max(cursor, 12 * 60) / 5) * 5
     slots.push({ kind: 'lunch', id: 'lunch', start, end: start + LUNCH_MIN, travel: { minutes: 0, walkKm: 0, mode: 'walk', km: 0 }, wait: start - cursor || undefined })
     cursor = start + LUNCH_MIN
     lunchDone = true
@@ -113,7 +113,8 @@ export function planDay(trip: Trip, day: number, all: Place[], meta?: DayMeta): 
     const away = far(p)
     const travel = away ? { minutes: 0, walkKm: 0, mode: 'walk' as const, km: 0 } : leg(pos, p, kids)
     const arrive = cursor + travel.minutes
-    let start = arrive
+    // Calm, round times: stops start on the next 5 minutes (10:50, not 10:47).
+    let start = Math.ceil(arrive / 5) * 5
     let warn: string | undefined
     const h = hoursOn(p, date)
     if (p.fixed != null) {

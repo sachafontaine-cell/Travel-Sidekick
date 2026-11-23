@@ -16,7 +16,7 @@ import { countdown, mustInfo } from '../lib/musts'
 import { planChecked, planPending, rebalance } from '../lib/rebalance'
 import { dateOf, tripDays, type Slot } from '../lib/planner'
 import { clock, shortDate, WEEKDAY, weekday } from '../lib/time'
-import { price } from '../lib/money'
+import { short } from '../lib/money'
 import { km, leg, legText } from '../lib/geo'
 import { byRank } from '../lib/rank'
 import { groupOf, type Group } from '../lib/groups'
@@ -33,7 +33,7 @@ export function Plan({ trip, day }: { trip: Trip; day: number }) {
       <TripBar />
       <h1 class="h1">Plan</h1>
       <div class="strip" role="tablist" aria-label="Days">
-        <button role="tab" aria-selected={day === 0} class={`pill press${day === 0 ? ' on' : ''}`} onClick={() => go(tripPath(trip.id, 'plan'), true)}>All</button>
+        <button role="tab" aria-selected={day === 0} class={`pill press${day === 0 ? ' on' : ''}`} onClick={() => go(tripPath(trip.id, 'plan'), true)}>List</button>
         <button role="tab" aria-selected={day === -1} class={`pill press${day === -1 ? ' on' : ''}`} onClick={() => go(tripPath(trip.id, 'plan/map'), true)}><Icon.pin />Map</button>
         {Array.from({ length: n }, (_, i) => i + 1).map((d) => {
           const date = dateOf(trip, d)
@@ -87,53 +87,46 @@ function All({ trip }: { trip: Trip }) {
   const list = sortList(all.filter((p) => p.status !== 'out'), f, trip)
   const out = sortList(all.filter((p) => p.status === 'out'), { ...f, hideTraps: false }, trip)
   const custom = f.sort !== 'mine' || f.hideTraps === false || f.under || f.kids || f.near
-  const checked = all.filter((p) => p.must && p.hours?.source === 'google' && p.hours.checkedAt).map((p) => p.hours!.checkedAt!).sort().at(-1)
   const ticked = list.filter((p) => p.status === 'picked').length
   const toDecide = queueFor(trip, settings.get().me).length
   const cap = capacity(trip, all)
 
+  const grouped = f.group !== false
   return (
     <>
-      {c.total > 0 && (
-        <div class="card hero">
-          <div class="between"><span class="h2">Must-sees {c.done} of {c.total}</span><span class="muted">{c.daysLeft} day{c.daysLeft === 1 ? '' : 's'} left</span></div>
-          <div class="bar" role="progressbar" aria-valuenow={c.done} aria-valuemax={c.total} aria-label="Must-sees done"><span style={{ width: `${(c.done / c.total) * 100}%` }} /></div>
-          {checked && <span class="muted small">Hours checked with Google · {new Date(checked).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })}</span>}
-          {risky.map((i) => (
-            <button class="between press" style={{ minHeight: '48px', textAlign: 'left' }} onClick={() => open({ kind: 'card', place: i.place.id })}>
-              <span class="grow"><b>{i.place.name}</b><br /><span class="muted small">{i.line}</span></span><StateChip s={i.state} />
-            </button>
-          ))}
-          {risky.length > 0 && <button class="btn btn-primary press" onClick={() => open({ kind: 'rebalance' })}>Fix it: save {risky.length === 1 ? 'it' : `all ${risky.length}`}</button>}
-        </div>
-      )}
-
       <RefreshBanner trip={trip} />
-
-      <div class="row">
-        <button class={`pill press${custom ? ' dark' : ''}`} aria-label="Sort & filter" onClick={() => open({ kind: 'sheet', name: 'filter' })}><Icon.filter />{custom ? 'Filtered' : 'Filter'}</button>
-        <span class="grow" />
-        <button class="pill press" onClick={() => open({ kind: 'sheet', name: 'discover' })}><Icon.search />Find more</button>
-        <button class="pill press" onClick={() => open({ kind: 'sheet', name: 'add', arg: trip.id })}><Icon.plus />Add</button>
-      </div>
+      {c.total > 0 && (risky.length > 0 ? (
+        <button class="banner press" onClick={() => open({ kind: 'rebalance' })}>
+          <span class="dot red" /><span class="grow"><b>Must-sees {c.done} of {c.total}</b> · {risky.length} at risk</span><span class="strong">Fix</span><Icon.chev />
+        </button>
+      ) : (
+        <div class="banner"><span class="dot" /><span class="grow"><b>Must-sees {c.done} of {c.total}</b> · all on a day</span></div>
+      ))}
 
       {toDecide > 0 && (
-        <button class="card card-pad press decide-cta" onClick={() => open({ kind: 'sheet', name: 'decide' })}>
-          <span class="grow stack" style={{ gap: '2px', textAlign: 'left' }}><b>Decide, one by one</b><span class="muted small">{toDecide} to go through: what each is like for your group, Great for / Skip if</span></span>
+        <button class="decide-cta press" onClick={() => open({ kind: 'sheet', name: 'decide' })}>
+          <span class="grow stack" style={{ gap: '2px', textAlign: 'left' }}><b>Help me choose</b><span class="muted small">{toDecide} to look at, one at a time</span></span>
           <Icon.chev />
         </button>
       )}
-      <div class="section-h"><span class="label">Activities · {ticked} checked</span>{list.length > 0 && <span class="muted small">Check what you want</span>}</div>
-      <div class="between" style={{ marginTop: '-8px' }}>
-        <span class={`small ${cap.left < -60 ? 'warn-text' : 'muted'}`}>{capacityText(cap)}</span>
-        <button class="link small press" onClick={() => open({ kind: 'sheet', name: 'review' })}>Check my list</button>
+      <div class="tools">
+        <button class="pill press" onClick={() => open({ kind: 'sheet', name: 'discover' })}><Icon.search />Find more</button>
+        <button class="pill press" onClick={() => open({ kind: 'sheet', name: 'review' })}><Icon.check />Check my list</button>
       </div>
-      {f.group === false ? <Section trip={trip} list={list} status="picked" draggable={f.sort === 'mine'} />
+
+      <div class="listhead">
+        <span class="grow stack" style={{ gap: '1px' }}><b>{ticked} wanted</b><span class={`small ${cap.left < -60 ? 'warn-text' : 'muted'}`}>{capacityText(cap)}</span></span>
+        <button class={`iconbtn ring press${custom ? ' on' : ''}`} aria-label="Sort & filter" onClick={() => open({ kind: 'sheet', name: 'filter' })}><Icon.filter /></button>
+        <button class="iconbtn ring press" aria-label="Add a place" onClick={() => open({ kind: 'sheet', name: 'add', arg: trip.id })}><Icon.plus /></button>
+      </div>
+      {!grouped ? <Section trip={trip} list={list} status="picked" draggable={f.sort === 'mine'} />
         : GROUPS.map(([name, key]) => {
+          // Within a type: must-sees, then best first (unless sorted another way).
           const g = list.filter((p) => groupOf(p) === key)
-          return g.length ? <Section trip={trip} title={name} hint={`${g.filter((p) => p.status === 'picked').length} of ${g.length}`} list={g} status="picked" draggable={f.sort === 'mine'} /> : null
+          if (f.sort === 'mine') g.sort((a, b) => Number(!!a.done) - Number(!!b.done) || Number(b.must) - Number(a.must) || b.worth - a.worth)
+          return g.length ? <Section trip={trip} title={name} hint={`${g.filter((p) => p.status === 'picked').length} of ${g.length}`} list={g} status="picked" draggable={false} /> : null
         })}
-      {list.length === 0 && <p class="muted small">Nothing here. Tap + Add.</p>}
+      {list.length === 0 && <p class="muted small">Nothing here yet. Tap Find more.</p>}
       {out.length > 0 && <button class="fold press" aria-expanded={showOut} onClick={() => setShowOut(!showOut)}>Skipped ({out.length}){showOut ? <Icon.up /> : <Icon.down />}</button>}
       {showOut && <Section trip={trip} list={out} status="out" draggable={false} />}
       <PlanBar trip={trip} />
@@ -218,12 +211,15 @@ function Row({ trip, p, draggable, onGrip }: { trip: Trip; p: Place; draggable: 
   const left = p.status === 'out' ? undefined : () => (p.must ? pushDown(p.id) : setStatus(p.id, 'out'))
   const right = p.status === 'picked' ? undefined : () => setStatus(p.id, p.status === 'out' ? 'maybe' : 'picked')
   const sw = swipeable(left, right)
+  const pt = here.get().pt
+  const t = !p.booked && pt ? travelFrom(trip, p, pt) : null
+  const unfit = p.status === 'picked' && p.day == null && unfitIds.get().includes(p.id)
   return (
-    <div class={`prow${p.done ? ' done' : ''}`} data-drag data-left={p.must ? 'To the bottom' : 'Skip'} data-right={p.status === 'out' ? 'Bring back' : 'Check'} {...sw}>
+    <div class={`prow${p.done ? ' done' : ''}`} data-drag data-left={p.must ? 'To the bottom' : 'Skip'} data-right={p.status === 'out' ? 'Bring back' : 'Want'} {...sw}>
       <Tick p={p} />
       <button class="open press" onClick={() => open({ kind: 'card', place: p.id })}>
-        <span class="name">{p.name}</span>
-        <span class="meta">{p.fresh && <span class="chip ok">New</span>}<BadgeChip p={p} />{p.scoring ? <span>Scoring…</span> : <span>Worth {p.worth} · {price(trip, p.price, false)}{!p.booked && here.get().pt ? (() => { const f = travelFrom(trip, p, here.get().pt!); return f ? ` · ${f.real ? '' : '≈'}${legText(f)}` : '' })() : ''}</span>}{p.day ? <span class="chip plain">Day {p.day}</span> : p.status === 'picked' && unfitIds.get().includes(p.id) ? <span class="chip amber">Doesn't fit</span> : null}{p.done && <span class="chip plain">Done</span>}</span>
+        <span class="line1">{p.must && <span class="star" aria-label="Must-see">★</span>}<span class="name">{p.name}</span>{p.day ? <span class="when">{p.done ? 'Done' : `Day ${p.day}`}</span> : unfit ? <span class="when warn-text">No room</span> : null}</span>
+        <span class="meta">{p.fresh && <span class="chip ok">New</span>}{p.badge === 'trap' && <span class="chip trap">Trap</span>}{p.scoring ? 'Scoring…' : `${p.worth}/10 · ${short(trip, p.price)}${t ? ` · ${t.real ? '' : '≈'}${legText(t)}` : ''}`}</span>
       </button>
       {draggable && <span class="handle" role="button" aria-label={`Drag to reorder ${p.name}`} onPointerDown={(e) => onGrip(e as unknown as PointerEvent)}><Icon.grip /></span>}
     </div>

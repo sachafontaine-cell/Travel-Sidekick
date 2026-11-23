@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { Icon, Sheet, Spinner } from '../ui'
 import { nowIn, places, save, tripPlaces, trips } from '../lib/data'
-import { close, open, replaceTop } from '../lib/nav'
+import { close, open } from '../lib/nav'
 import { createStore } from '../lib/store'
 import { setDay } from '../lib/actions'
 import { discover, scorePlace } from '../lib/ai'
@@ -157,17 +157,14 @@ export function DiscoverSheet({ trip }: { trip: Trip }) {
   }
   return (
     <Sheet title="Find more">
-      <p class="muted small">Gemini searches Google for your dates and where you are.</p>
-      <div class="row">
-        <button class="btn btn-secondary grow press" disabled={!!state.busy} onClick={() => replaceTop({ kind: 'sheet', name: 'review' })}><Icon.check />Check my list</button>
-        <button class="btn btn-primary grow press" disabled={!!state.busy} onClick={deep}><Icon.search />Search everything</button>
-      </div>
-      <p class="muted small" style={{ marginTop: '-6px' }}>Check: what's missing and what doesn't fit your vibe (1 min). Search everything: every kind of place, one search each (1–2 min).</p>
-      <div class="chips">{FOCUS.map(([l, f]) => <button class="pill press" disabled={!!state.busy} onClick={() => run(l, f)}>{l}</button>)}</div>
       <div class="row">
         <input class="field grow" placeholder="Something specific, e.g. turtle release" value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter' && text.trim()) void run(text.trim(), `specifically: ${text.trim()}`) }} />
         <button class="btn btn-primary btn-sm press" disabled={!text.trim() || !!state.busy} onClick={() => run(text.trim(), `specifically: ${text.trim()}`)}>Search</button>
       </div>
+      <div class="chips">{FOCUS.map(([l, f]) => <button class="pill press" disabled={!!state.busy} onClick={() => run(l, f)}>{l}</button>)}</div>
+      <button class="kv press card" style={{ borderRadius: '14px' }} disabled={!!state.busy} onClick={deep}>
+        <span class="row" style={{ gap: '10px' }}><Icon.search /><span class="stack" style={{ gap: '1px', textAlign: 'left' }}><b>Search everything</b><span class="muted small">Every kind of place, one Google search each · 2 min</span></span></span><Icon.chev />
+      </button>
       {state.busy && <div class="row muted"><Spinner />Searching {state.busy}…</div>}
       {state.done && <p class="answer">{state.done}</p>}
       {state.err && <p class="answer err">{state.err}</p>}

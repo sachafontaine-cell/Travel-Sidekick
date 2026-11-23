@@ -11,6 +11,8 @@ export function price(trip: Pick<Trip, 'dest' | 'home' | 'fx'>, amount: number, 
   if (trip.dest.currency === trip.home || !trip.fx) return local
   return `${local} (${fmt(amount * trip.fx.rate, trip.home)})`
 }
+/** The amount in the home currency, if it differs and the rate is known ("$125"), else in the local one. */
+export const home = (trip: Pick<Trip, 'dest' | 'home' | 'fx'>, amount: number) => (trip.fx && trip.home && trip.home !== trip.dest.currency ? fmt(amount * trip.fx.rate, trip.home) : fmt(amount, trip.dest.currency))
 export const short = (trip: Pick<Trip, 'dest'>, amount: number) => (amount ? fmt(amount, trip.dest.currency) : 'Free')
 export const symbol = (currency: string) => fmt(0, currency).replace(/[\d.,\s]/g, '') || currency
 

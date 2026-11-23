@@ -10,8 +10,10 @@ import { close, open, replaceTop } from '../lib/nav'
 import { setDone, setMinutes, setMust, setStatus, setTime } from '../lib/actions'
 import { dateOf, hoursOn } from '../lib/planner'
 import { clock, duration, pad } from '../lib/time'
-import { price } from '../lib/money'
+import { home, short } from '../lib/money'
 import type { Place, Trip } from '../lib/model'
+import { groupOf } from '../lib/groups'
+import { GROUP_COLOR, GROUP_NAME } from '../lib/groupStyle'
 import { legText, type Mode } from '../lib/geo'
 import { travelFrom, routeHere, useHereTimes } from '../lib/routes'
 import { here, locate } from '../lib/here'
@@ -25,7 +27,7 @@ function MapsTile({ href }: { href: string }) {
 
 export function Photos({ p, size = 'big', maps }: { p: Place; size?: 'big' | 'thumb'; maps?: string }) {
   const urls = p.photos?.urls ?? []
-  if (!urls.length) return maps && size === 'big' ? <div class="photos"><MapsTile href={maps} /></div> : null
+  if (!urls.length) return null
   if (size === 'thumb') return <img class="thumb" src={urls[0]} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onLoad={(e) => (e.currentTarget as HTMLImageElement).classList.add('in')} />
   return (
     <div class={`photos${urls.length === 1 ? ' one' : ''}`}>
@@ -35,26 +37,37 @@ export function Photos({ p, size = 'big', maps }: { p: Place; size?: 'big' | 'th
   )
 }
 
-/** From where you are now: all three ways, ours in bold, and Directions. */
-function FromHere({ trip, p }: { trip: Trip; p: Place }) {
+/** Travel from where you are: Google Maps times once fetched, the app's estimate until then. */
+function useTravel(trip: Trip, p: Place) {
   const loc = here.use()
   useHereTimes()
   useEffect(() => { void locate() }, [])
   const f = loc.pt ? travelFrom(trip, p, loc.pt) : null
-  // Real Google Maps times for this place from here (estimate until they arrive).
   useEffect(() => { if (loc.pt && f && !f.real) void routeHere(trip, p, loc.pt).catch(() => { /* later */ }) }, [p.id, loc.pt?.lat, loc.pt?.lng])
-  const I = { walk: Icon.walk, transit: Icon.train, car: Icon.car }
-  const dir = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${p.name}, ${trip.dest.name}`)}&travelmode=${f?.mode === 'car' ? 'driving' : f?.mode === 'transit' ? 'transit' : 'walking'}`
-  const ap = f?.real ? '' : '≈'
+  return { f, loc }
+}
+const MODE_ICON = { walk: Icon.walk, transit: Icon.train, car: Icon.car }
+const directions = (trip: Trip, p: Place, mode?: Mode) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${p.name}, ${trip.dest.name}`)}${mode ? `&travelmode=${mode === 'car' ? 'driving' : mode === 'transit' ? 'transit' : 'walking'}` : ''}`
+
+/** All three ways from here, ours highlighted. */
+function TravelPanel({ trip, p, f }: { trip: Trip; p: Place; f: NonNullable<ReturnType<typeof useTravel>['f']> }) {
+  const ap = f.real ? '' : '≈'
   return (
-    <div class="fromhotel">
-      {!f ? (
-        <div class="between"><span class="small muted">{loc.busy || !loc.error ? 'Finding you…' : loc.error}</span>{loc.error && !loc.busy && <button class="link small press" onClick={() => void locate(true)}>Try again</button>}</div>
-      ) : <>
-        <div class="between"><span class="small"><b>{ap}{legText(f)}</b> from here · {f.km < 10 ? f.km.toFixed(1) : Math.round(f.km)} km</span><a class="link small press" href={dir} target="_blank" rel="noopener">Directions<Icon.out /></a></div>
-        <div class="modes">{(['walk', 'transit', 'car'] as Mode[]).filter((m) => f.times[m] != null).map((m) => { const M = I[m]; return <span class={`mode${m === f.mode ? ' on' : ''}`}><M />{ap}{f.times[m]} min</span> })}</div>
-        <span class="muted small">{f.real ? 'Google Maps times, with traffic now' : connected() ? 'Estimate: getting Google Maps times…' : 'Estimate: Google Maps times need the family script (⚙)'}</span>
-      </>}
+    <div class="fold-panel">
+      <div class="modes">{(['walk', 'transit', 'car'] as Mode[]).filter((m) => f.times[m] != null).map((m) => { const M = MODE_ICON[m]; return <span class={`mode${m === f.mode ? ' on' : ''}`}><M />{ap}{f.times[m]} min</span> })}</div>
+      <div class="between"><span class="muted small">{f.km < 10 ? f.km.toFixed(1) : Math.round(f.km)} km · {f.real ? 'Google Maps, traffic now' : connected() ? 'estimate, checking Google Maps…' : 'estimate'}</span><a class="link small press" href={directions(trip, p, f.mode)} target="_blank" rel="noopener">Directions<Icon.out /></a></div>
+    </div>
+  )
+}
+
+/** Why it scores what it does: the bars and their weights. */
+function WhyPanel({ trip, p }: { trip: Trip; p: Place }) {
+  const w = weights(hasKids(trip))
+  const val = (k: string) => (k === 'Value' ? p.value : k === 'Iconic' ? p.sub.iconic : k === 'Vibe fit' ? p.sub.vibe : k === 'Kid fit' ? p.sub.kid : p.sub.hassle)
+  return (
+    <div class="fold-panel">
+      {w.map(([k, wt]) => <div class="score"><span>{k} <span class="muted small">{Math.round(wt * 100)}%</span></span><div class="bar"><span style={{ width: `${val(k) * 10}%` }} /></div><b class="num">{val(k)}</b></div>)}
+      {p.why && <p class="small">{p.why}</p>}
     </div>
   )
 }
@@ -81,8 +94,8 @@ export function Votes({ p }: { p: Place }) {
 /** Where it is, and whether that was checked on a map (Gemini's own coordinates can be off). */
 function Where({ p }: { p: Place }) {
   const l = p.loc
-  if (l?.src === 'google' || l?.src === 'osm') return <p class="muted small" style={{ marginTop: '-6px' }}>📍 {l.address ?? 'On the map'}{l.exact === false ? ' (area only)' : ''}</p>
-  return <p class="small warn-text" style={{ marginTop: '-6px' }}>{l?.src === 'none' ? 'Not found on Google Maps: its spot on the map may be off' : 'Checking where it is…'}</p>
+  if (l?.src === 'google' || l?.src === 'osm') return <span class="muted small trunc" style={{ maxWidth: '100%' }}>📍 {(l.address ?? 'On the map').split(',').slice(0, 2).join(',')}{l.exact === false ? ' (area)' : ''}</span>
+  return <span class="small warn-text">{l?.src === 'none' ? '📍 Not found on Google Maps: may be off' : '📍 Checking where it is…'}</span>
 }
 
 const tried = new Set<string>()
@@ -103,13 +116,15 @@ const REC = { pay: 'Pay for it', cheaper: 'Do the cheaper version', skip: 'Skip 
 
 export function Card({ trip, id }: { trip: Trip; id: string }) {
   const p = places.use()[id]
-  const [why, setWhy] = useState(false)
+  const [open2, setOpen] = useState<'why' | 'travel' | null>(null)
+  const toggle = (k: 'why' | 'travel') => setOpen(open2 === k ? null : k)
   // Photos are looked up in the background; if this one hasn't been yet, do it now (never blocks).
   useEffect(() => { if (p && !p.photos && !tried.has(id)) { tried.add(id); void photoFor(p, trip) } }, [id])
   // "New" (from a refresh) goes away once you've looked.
   useEffect(() => { if (p?.fresh) { const { fresh: _, ...rest } = p; save('place', [rest]) } }, [id])
   // A description for your group (and Great for / Skip if) the first time the card opens.
   useEffect(() => { if (p) { void fillAbout(trip, [p]); void locateAll(trip, [p]).catch(() => {}) } }, [id])
+  const { f, loc } = useTravel(trip, p ?? ({} as Place))
   if (!p) return null
   const now = nowIn(trip)
   const day = p.day ?? null
@@ -117,37 +132,47 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
   const h = hoursOn(p, date)
   const slot = day ? plansFor(trip)[day - 1]?.slots.find((s) => s.id === p.id) : undefined
   const group = p.price * Math.max(1, trip.people.length)
-  const checked = p.hours?.source === 'google' && p.hours.checkedAt ? new Date(p.hours.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hourCycle: 'h23' }) : null
   // Flights and other bookings that aren't activities: no score, price, photos or opening hours.
   const ticket = !!p.booked && p.kind === 'other'
   const maps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.name}, ${trip.dest.name}`)}`
+  const g = groupOf(p)
+  const M = f ? MODE_ICON[f.mode] : null
   return (
     <Dialog label={p.name}>
       <div class="between">
         <button class={`pill press${p.must ? ' on' : ''}`} aria-pressed={p.must} onClick={() => setMust(p.id, !p.must)} style={p.must ? { background: 'var(--star-bg)', color: 'var(--star)', borderColor: 'var(--star-bg)' } : undefined}>
           {p.must ? <Icon.star /> : <Icon.starOff />}{p.must ? 'Must-see' : 'Make must-see'}
         </button>
-        <div class="row"><BadgeFull p={p} /><button class="iconbtn ring press" aria-label="Close" onClick={close}><Icon.x /></button></div>
+        <button class="iconbtn ring press" aria-label="Close" onClick={close}><Icon.x /></button>
       </div>
       {!ticket && <Photos p={p} maps={maps} />}
-      <h2 class="h2">{p.name}</h2>
-      {!ticket && <Where p={p} />}
-      {ticket && <p class="muted">{p.booked}{p.why ? ` · ${p.why}` : ''}</p>}
+      <div class="stack" style={{ gap: '4px' }}>
+        <h2 class="h2">{p.name}</h2>
+        {ticket ? <p class="muted">{p.booked}{p.why ? ` · ${p.why}` : ''}</p> : (
+          <div class="row" style={{ flexWrap: 'wrap', gap: '6px' }}>
+            <span class="muted small"><span class="dot" style={{ background: GROUP_COLOR[g] }} /> {GROUP_NAME[g]}</span>
+            <BadgeFull p={p} />
+            <Where p={p} />
+          </div>
+        )}
+      </div>
 
-      {ticket ? null : p.scoring ? <p class="muted">Scoring… a few seconds.</p> : (
-        <div class="between" style={{ alignItems: 'flex-start' }}>
-          <div class="stat"><span class="muted small">Worth it</span><span class="big num">{p.worth}<small>/10</small></span></div>
-          <div class="stat" style={{ textAlign: 'right' }}><span class="muted small">Price</span><span class="big num" style={{ fontSize: '20px' }}>{price(trip, p.price)}</span>{p.price > 0 && <span class="muted small">{price(trip, group, false)} for {trip.people.length}</span>}</div>
+      {!ticket && (p.scoring ? <p class="muted">Scoring… a few seconds.</p> : <>
+        <div class="facts3">
+          <button class={`fact press${open2 === 'why' ? ' on' : ''}`} aria-expanded={open2 === 'why'} onClick={() => toggle('why')}>
+            <b class="num">{p.worth}<small>/10</small></b><span class="muted small">Why? {open2 === 'why' ? <Icon.up /> : <Icon.down />}</span>
+          </button>
+          <div class="fact"><b class="num">{p.price ? <>{short(trip, p.price)}<small> pp</small></> : 'Free'}</b><span class="muted small">{p.price ? `${home(trip, group)} for ${trip.people.length}` : 'for everyone'}</span></div>
+          <button class={`fact press${open2 === 'travel' ? ' on' : ''}`} aria-expanded={open2 === 'travel'} disabled={!f} onClick={() => toggle('travel')}>
+            {f && M ? <><b class="num"><M />{f.real ? '' : '≈'}{f.minutes} min</b><span class="muted small">from here {open2 === 'travel' ? <Icon.up /> : <Icon.down />}</span></>
+              : <><b class="num">–</b><span class="muted small">{loc.busy || !loc.error ? 'Finding you…' : 'Location off'}</span></>}
+          </button>
         </div>
-      )}
-      {!ticket && p.recText && <p><b>{p.rec === 'pay' && p.price === 0 ? 'Go for it' : REC[p.rec]}.</b> {cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?)[:.,;]?\s*/i, ''))}</p>}
-      {p.desc ? <p class="desc">{p.desc}</p> : !p.scoring && !p.booked && settings.get().geminiKey ? <p class="muted small">Getting a description…</p> : null}
-      {(p.good || p.skipIf) && <GoodSkip p={p} />}
-      <Votes p={p} />
+        {open2 === 'why' && <WhyPanel trip={trip} p={p} />}
+        {open2 === 'travel' && f && <TravelPanel trip={trip} p={p} f={f} />}
+      </>)}
 
-      {!ticket && <FromHere trip={trip} p={p} />}
-
-      {/* Where it stands: one tap, always visible. Must-sees can't be skipped. */}
+      {/* The decision: one tap, always near the top. Must-sees can't be skipped. */}
       {!ticket && <div class="seg" role="group" aria-label="In the plan">
         {(['picked', 'maybe', 'out'] as const).map((s) => s === 'out' && p.must ? null : (
           <button class={p.status === s ? 'on press' : 'press'} aria-pressed={p.status === s} onClick={() => setStatus(p.id, s)}>{s === 'picked' ? 'Want it' : s === 'maybe' ? 'Maybe' : 'Skip'}</button>
@@ -155,42 +180,35 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
       </div>}
       {p.status !== 'out' && (
         <div class="row">
-          <button class="btn btn-primary grow press" onClick={() => open({ kind: 'sheet', name: 'day', arg: p.id })}>{day ? `Day ${day}` : 'Add to a day'} <Icon.down /></button>
-          {day != null && <button class={`btn btn-sm press ${p.done ? 'btn-primary' : 'btn-quiet'}`} aria-pressed={!!p.done} onClick={() => setDone(p.id, !p.done)}><Icon.check />Done</button>}
+          <button class={`btn ${day ? 'btn-secondary' : 'btn-primary'} grow press`} onClick={() => open({ kind: 'sheet', name: 'day', arg: p.id })}>{day ? `Day ${day}` : 'Add to a day'} <Icon.down /></button>
+          {day != null && (slot || p.fixed != null) && <Clock24 label={`Start time of ${p.name}`} value={p.fixed ?? slot!.start} custom={p.fixed != null} onChange={(v) => setTime(trip, p.id, v)} />}
+          {day != null && <button class={`iconbtn ring press${p.done ? ' on' : ''}`} aria-label={p.done ? 'Done (tap to undo)' : 'Mark done'} aria-pressed={!!p.done} onClick={() => setDone(p.id, !p.done)}><Icon.check /></button>}
         </div>
       )}
-      {p.status !== 'out' && day != null && (slot || p.fixed != null) && (
-        <div class="timerow">
-          <span class="grow"><span class="strong">Start time</span><br /><span class="muted small">{p.fixed != null ? (p.booked ? 'Booked time' : 'Set by you') : 'Set by the planner'}</span></span>
-          <Clock24 label={`Start time of ${p.name}`} value={p.fixed ?? slot!.start} custom={p.fixed != null} onChange={(v) => setTime(trip, p.id, v)} />
-          {p.fixed != null && !p.booked && <button class="btn btn-quiet btn-sm press" onClick={() => setTime(trip, p.id, null)}>Auto</button>}
-        </div>
+      {p.status !== 'out' && day != null && (
+        <span class="muted small" style={{ marginTop: '-6px' }}>{p.fixed != null ? (p.booked ? 'Booked time' : <>Your time · <button class="link small press" onClick={() => setTime(trip, p.id, null)}>let the planner choose</button></>) : 'Time chosen by the planner: change it any time'}{p.done ? ' · Done ✓' : ''}</span>
       )}
 
-      {!ticket && <div class="banner" style={{ padding: '6px 6px 6px 14px' }}>
-        <span class="grow small">{h === undefined ? 'Hours not known yet' : h === null ? <b style={{ color: 'var(--red)' }}>Closed {day ? `on Day ${day}` : 'today'}</b> : <><b>Open {clock(h[0])}–{clock(h[1])}</b>{day ? ` on Day ${day}` : ' today'}</>}
-          <br /><span class="muted">{checked ? `Checked with Google · ${checked}` : 'Checked with Google each morning'}</span></span>
-        <a class="btn btn-quiet btn-sm press" href={maps} target="_blank" rel="noopener">Check hours<Icon.out /></a>
-      </div>}
+      {!ticket && p.recText && <p><b>{p.rec === 'pay' && p.price === 0 ? 'Go for it' : REC[p.rec]}.</b> {cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?)[:.,;]?\s*/i, ''))}</p>}
+      {p.desc ? <p class="desc">{p.desc}</p> : !p.scoring && !ticket && settings.get().geminiKey ? <p class="muted small">Getting a description…</p> : null}
+      {(p.good || p.skipIf) && <GoodSkip p={p} />}
+      <Votes p={p} />
+      {p.tip && <p class="small"><b>Tip:</b> {p.tip}</p>}
 
+      {!ticket && (
+        <div class="between small hoursline">
+          <span>{h === undefined ? 'Hours not known' : h === null ? <b class="warn-text">Closed {day ? `on Day ${day}` : 'today'}</b> : <>Open <b>{clock(h[0])}–{clock(h[1])}</b> {day ? `on Day ${day}` : 'today'}</>}</span>
+          <a class="link small press" href={maps} target="_blank" rel="noopener">Check<Icon.out /></a>
+        </div>
+      )}
       <Stepper label="Time there" hint={`(suggested ${duration(p.suggested)})`} value={p.minutes} show={duration} step={15} min={15} max={600} custom={p.minutes !== p.suggested} onChange={(v) => setMinutes(p.id, v)} />
 
-      <button class="btn btn-quiet press" onClick={() => replaceTop({ kind: 'ask', place: p.id })}><Icon.chat />Ask about this</button>
-
+      <div class="linksrow">
+        {!ticket && <a class="btn btn-quiet btn-sm press" href={maps} target="_blank" rel="noopener"><Icon.photo />Photos</a>}
+        <a class="btn btn-quiet btn-sm press" href={directions(trip, p, f?.mode)} target="_blank" rel="noopener"><Icon.pin />Directions</a>
+        <button class="btn btn-quiet btn-sm press" onClick={() => replaceTop({ kind: 'ask', place: p.id })}><Icon.chat />Ask</button>
+      </div>
       {p.photos?.urls.length ? <span class="muted small">Photo{p.photos.urls.length > 1 ? 's' : ''}: <a href={`https://${p.photos.lang}.wikipedia.org/wiki/${encodeURIComponent(p.photos.title.replace(/ /g, '_'))}`} target="_blank" rel="noopener">Wikipedia</a></span> : null}
-      {!p.scoring && !ticket && (
-        <button class="link press" aria-expanded={why} onClick={() => setWhy(!why)}>Why {p.worth}?{why ? <Icon.up /> : <Icon.down />}</button>
-      )}
-      {why && (
-        <div class="stack">
-          <p class="muted small">{p.worth} = {weights(hasKids(trip)).map(([k, w]) => `${k} ${Math.round(w * 100)}%`).join(' + ')}</p>
-          {weights(hasKids(trip)).map(([k]) => { const v = k === 'Value' ? p.value : k === 'Iconic' ? p.sub.iconic : k === 'Vibe fit' ? p.sub.vibe : k === 'Kid fit' ? p.sub.kid : p.sub.hassle; return (
-            <div class="score"><span>{k}</span><div class="bar"><span style={{ width: `${v * 10}%` }} /></div><b class="num">{v}</b></div>
-          ) })}
-          {p.why && <p><b>Why:</b> {p.why}</p>}
-          {p.tip && <p><b>Tip:</b> {p.tip}</p>}
-        </div>
-      )}
     </Dialog>
   )
 }

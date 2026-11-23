@@ -291,8 +291,32 @@ textarea.field { height: auto; padding: 10px 12px; resize: vertical; line-height
 .facts > div { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
 .decide-foot { position: sticky; bottom: -16px; margin: 0 -16px -16px; padding: 10px 16px 16px; background: var(--bg); border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .decide-btns { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 8px; width: 100%; }
-.decide-cta { display: flex; align-items: center; gap: 10px; border-color: var(--gold); }
 .pin.guess { border-style: dashed; opacity: .75; }
 .clock24 { display: inline-flex; align-items: center; gap: 2px; padding: 0 6px; min-height: 48px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
 .clock24.custom { border: 2px solid var(--gold); }
 .clock24 select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; font: inherit; font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); padding: 6px 4px; text-align: center; }
+
+/* Card: three key facts, tap for why / travel */
+.facts3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.fact { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 10px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); text-align: left; min-height: 64px; }
+.fact b { font-size: 19px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.fact b small { font-size: 13px; color: var(--muted); font-weight: 600; }
+.fact b svg { width: 18px; height: 18px; }
+.fact .small svg { width: 12px; height: 12px; vertical-align: -1px; }
+.fact.on { border-color: var(--primary); }
+button.fact:disabled { opacity: 1; }
+.fold-panel { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); margin-top: -4px; }
+.linksrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+.linksrow .btn { padding: 0 8px; }
+.hoursline { padding: 2px 2px; }
+.iconbtn.ring.on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+
+/* Plan list: tools, list header, two-line rows */
+.tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tools .pill { justify-content: center; }
+.listhead { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.prow .line1 { display: flex; align-items: baseline; gap: 6px; width: 100%; }
+.prow .line1 .name { flex: 1; min-width: 0; }
+.prow .when { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.prow .star { color: var(--gold-text, var(--gold)); }
+.decide-cta { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 16px; background: var(--surface); border: 1.5px solid var(--gold); }

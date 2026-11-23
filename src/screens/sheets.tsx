@@ -188,7 +188,7 @@ export function DaySheet({ trip, id }: { trip: Trip; id: string }) {
           return (
             <button class="kv press" disabled={closed} style={closed ? { opacity: 0.5 } : undefined} onClick={() => { setDay(p.id, d); close() }}>
               <span><b>{d === first && nowIn(trip).day === d ? 'Today' : `Day ${d}`}</b> · {WEEKDAY[weekday(date)]} {shortDate(date)}</span>
-              <span class="v">{p.day === d ? <span class="chip ok">Here</span> : p.fixed != null && p.booked ? 'Booked on another day' : closed ? 'Closed' : `${pl.slots.filter((s) => s.kind === 'place').length} stops`}</span>
+              <span class="v">{p.day === d ? <span class="chip ok">Here</span> : p.fixed != null && p.booked ? 'Booked on another day' : closed ? 'Closed' : (() => { const k = pl.slots.filter((s) => s.kind === 'place').length; return k ? `${k} stop${k === 1 ? '' : 's'}` : 'Free' })()}</span>
             </button>
           )
         })}

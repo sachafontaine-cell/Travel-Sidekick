@@ -139,22 +139,23 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
   const M = f ? MODE_ICON[f.mode] : null
   return (
     <Dialog label={p.name}>
-      <div class="between">
-        <button class={`pill press${p.must ? ' on' : ''}`} aria-pressed={p.must} onClick={() => setMust(p.id, !p.must)} style={p.must ? { background: 'var(--star-bg)', color: 'var(--star)', borderColor: 'var(--star-bg)' } : undefined}>
-          {p.must ? <Icon.star /> : <Icon.starOff />}{p.must ? 'Must-see' : 'Make must-see'}
-        </button>
-        <button class="iconbtn ring press" aria-label="Close" onClick={close}><Icon.x /></button>
-      </div>
       {!ticket && <Photos p={p} maps={maps} />}
-      <div class="stack" style={{ gap: '4px' }}>
-        <h2 class="h2">{p.name}</h2>
-        {ticket ? <p class="muted">{p.booked}{p.why ? ` · ${p.why}` : ''}</p> : (
-          <div class="row" style={{ flexWrap: 'wrap', gap: '6px' }}>
-            <span class="muted small"><span class="dot" style={{ background: GROUP_COLOR[g] }} /> {GROUP_NAME[g]}</span>
-            <BadgeFull p={p} />
-            <Where p={p} />
-          </div>
-        )}
+      {/* The name first; must-see is a star next to Close, like a favourite. */}
+      <div class="cardhead">
+        <div class="grow stack" style={{ gap: '4px', minWidth: 0 }}>
+          <h2 class="h2">{p.name}</h2>
+          {ticket ? <p class="muted">{p.booked}{p.why ? ` · ${p.why}` : ''}</p> : (
+            <div class="row" style={{ flexWrap: 'wrap', gap: '6px' }}>
+              {p.must && <span class="chip star"><Icon.star />Must-see</span>}
+              <span class="muted small"><span class="dot" style={{ background: GROUP_COLOR[g] }} /> {GROUP_NAME[g]}</span>
+              {p.badge !== 'worth' && <BadgeFull p={p} />}
+              {p.done && <span class="chip plain">Done</span>}
+              <Where p={p} />
+            </div>
+          )}
+        </div>
+        {!ticket && <button class={`iconbtn ring press starbtn${p.must ? ' on' : ''}`} aria-label={p.must ? 'Must-see' : 'Make must-see'} aria-pressed={p.must} onClick={() => setMust(p.id, !p.must)}>{p.must ? <Icon.star /> : <Icon.starOff />}</button>}
+        <button class="iconbtn ring press" aria-label="Close" onClick={close}><Icon.x /></button>
       </div>
 
       {!ticket && (p.scoring ? <p class="muted">Scoring… a few seconds.</p> : <>
@@ -180,16 +181,17 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
       </div>}
       {p.status !== 'out' && (
         <div class="row">
-          <button class={`btn ${day ? 'btn-secondary' : 'btn-primary'} grow press`} onClick={() => open({ kind: 'sheet', name: 'day', arg: p.id })}>{day ? `Day ${day}` : 'Add to a day'} <Icon.down /></button>
+          <button class={`btn ${day || p.status !== 'picked' ? 'btn-secondary' : 'btn-primary'} grow press`} onClick={() => open({ kind: 'sheet', name: 'day', arg: p.id })}>{day ? `Day ${day}` : 'Add to a day'} <Icon.down /></button>
           {day != null && (slot || p.fixed != null) && <Clock24 label={`Start time of ${p.name}`} value={p.fixed ?? slot!.start} custom={p.fixed != null} onChange={(v) => setTime(trip, p.id, v)} />}
-          {day != null && <button class={`iconbtn ring press${p.done ? ' on' : ''}`} aria-label={p.done ? 'Done (tap to undo)' : 'Mark done'} aria-pressed={!!p.done} onClick={() => setDone(p.id, !p.done)}><Icon.check /></button>}
+          {day != null && <button class={`btn btn-sm press donebtn${p.done ? ' on' : ''}`} aria-pressed={!!p.done} onClick={() => setDone(p.id, !p.done)}><Icon.check />Done</button>}
         </div>
       )}
-      {p.status !== 'out' && day != null && (
-        <span class="muted small" style={{ marginTop: '-6px' }}>{p.fixed != null ? (p.booked ? 'Booked time' : <>Your time · <button class="link small press" onClick={() => setTime(trip, p.id, null)}>let the planner choose</button></>) : 'Time chosen by the planner: change it any time'}{p.done ? ' · Done ✓' : ''}</span>
+      {p.status !== 'out' && day != null && p.fixed != null && (
+        <span class="muted small" style={{ marginTop: '-6px' }}>{p.booked ? 'Booked time' : <>Your time · <button class="link small press" onClick={() => setTime(trip, p.id, null)}>let the planner choose</button></>}</span>
       )}
 
-      {!ticket && p.recText && <p><b>{p.rec === 'pay' && p.price === 0 ? 'Go for it' : REC[p.rec]}.</b> {cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?)[:.,;]?\s*/i, ''))}</p>}
+      {/* Advice only when it changes something (cheaper version, skip); plain "pay for it" needs no label. */}
+      {!ticket && p.recText && <p>{p.rec !== 'pay' && <b>{REC[p.rec]}. </b>}{cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?|Go for it)[:.,;]?\s*/i, ''))}</p>}
       {p.desc ? <p class="desc">{p.desc}</p> : !p.scoring && !ticket && settings.get().geminiKey ? <p class="muted small">Getting a description…</p> : null}
       {(p.good || p.skipIf) && <GoodSkip p={p} />}
       <Votes p={p} />

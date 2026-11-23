@@ -367,3 +367,11 @@ button.fact:disabled { opacity: 1; }
 .setval.ok { color: var(--success); }
 .setval.todo { color: var(--gold-text); font-weight: 600; }
 .setval.bad { color: var(--danger); font-weight: 600; }
+
+/* Card head: name and facts left; must-see star and Close right */
+.cardhead { display: flex; align-items: flex-start; gap: 8px; }
+.iconbtn.ring.starbtn.on { background: var(--star-bg); color: var(--star); border-color: var(--star-bg); }
+.donebtn { flex-shrink: 0; padding: 0 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+.donebtn.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.linksrow .btn { padding: 0 6px; font-size: 15px; gap: 6px; }
+.linksrow .btn svg { width: 18px; height: 18px; }

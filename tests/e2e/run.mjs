@@ -183,7 +183,7 @@ await test('sample trip: set your own start time on the Card; Auto gives it back
   expect((await row.locator('.t').innerText()).trim() === '15:00', 'the day shows it at 15:00')
   await row.locator('.open').click()
   await p.getByRole('button', { name: 'let the planner choose' }).click()
-  await p.getByText(/Time chosen by the planner/).waitFor()
+  await p.getByText('Your time').waitFor({ state: 'detached' })
   expect(p.errors.length === 0, 'no console errors: ' + p.errors.join(' | '))
   await p.context().close()
 })

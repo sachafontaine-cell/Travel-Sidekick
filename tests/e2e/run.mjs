@@ -52,6 +52,12 @@ await test('sample trip: Today shows next up, leave-by, what now, and asks about
   // Every trip screen has a way back to all trips, and to ⚙.
   await p.getByRole('button', { name: 'This app: key, family link, alerts' }).click()
   await p.getByRole('dialog', { name: 'This app' }).waitFor()
+  // Settings: a status line, then rows with their state; each opens its own page (‹ back).
+  await p.getByText('things to set up').or(p.getByText('thing to set up')).first().waitFor()
+  await p.getByRole('button', { name: /Gemini \(AI\).*Add key/ }).click()
+  await p.getByRole('dialog', { name: 'Gemini' }).getByRole('button', { name: 'Paste key' }).waitFor()
+  await p.getByRole('dialog', { name: 'Gemini' }).getByRole('button', { name: 'Back' }).click()
+  await p.getByRole('dialog', { name: 'This app' }).waitFor()
   await p.keyboard.press('Escape')
   await p.getByRole('button', { name: 'All trips' }).click()
   await p.getByRole('heading', { name: 'Trips' }).waitFor()

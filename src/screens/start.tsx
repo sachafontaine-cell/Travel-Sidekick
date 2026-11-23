@@ -94,7 +94,7 @@ export function Start({ trip }: { trip: Trip }) {
       {!s.geminiKey ? (
         <div class="card card-pad stack">
           <p>Gemini (free) builds the list. Add your key once.</p>
-          <button class="btn btn-primary press" onClick={() => open({ kind: 'sheet', name: 'app' })}>Add the Gemini key</button>
+          <button class="btn btn-primary press" onClick={() => open({ kind: 'sheet', name: 'app', arg: 'key' })}>Add the Gemini key</button>
         </div>
       ) : (
         <>

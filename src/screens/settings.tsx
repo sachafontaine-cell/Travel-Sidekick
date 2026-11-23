@@ -4,7 +4,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { Icon, Sheet, Spinner } from '../ui'
 import { settings, trips } from '../lib/data'
 import { flashModels, AiError } from '../lib/gemini'
-import { connected, familyKey, setAlerts, setKayak, shareKey, syncNow, syncState } from '../lib/sync'
+import { connected, familyKey, SCRIPT_NEEDED, setAlerts, setKayak, shareKey, syncNow, syncState } from '../lib/sync'
 import { updateNow } from '../lib/update'
 import { DEMO } from '../lib/store'
 
@@ -92,7 +92,9 @@ function Family() {
   return (
     <div class="stack">
       <div class="row"><span class={`chip ${st.error ? 'amber' : 'ok'}`}>{st.error ? 'Sync problem' : 'Connected'}</span><span class="muted small">{st.error ? st.error : ago == null ? 'Not synced yet' : ago < 1 ? 'Synced just now' : `Synced ${ago} min ago`}{st.script ? ` · script v${st.script}` : ''}</span></div>
-      <button class="btn btn-quiet btn-sm press" onClick={() => void syncNow()}>Sync now</button>
+      <p class="muted small">Keeps both phones the same, reads booking emails, and gives Google Maps times and locations.</p>
+      <button class="btn btn-quiet press" onClick={() => void syncNow()}><Icon.refresh />Sync now</button>
+      <span class="label">Add the other phone</span>
       <FamilyLink />
     </div>
   )
@@ -107,7 +109,7 @@ function FamilyLink() {
   const share = async () => { try { await navigator.share({ title: 'Travel Sidekick family link', text: 'Open once on your phone (keep it private):', url: link }) } catch { /* closed */ } }
   return (
     <div class="stack">
-      <span class="muted small">Open once on the other phone. Keep it private.</span>
+      <span class="muted small">Open this link once on the other phone. It holds your family key: keep it private.</span>
       <div class="row">
         <button class="btn btn-quiet btn-sm grow press" onClick={copy}>Copy link</button>
         {'share' in navigator && <button class="btn btn-quiet btn-sm grow press" onClick={share}>Share</button>}
@@ -131,7 +133,7 @@ function Alerts() {
   }
   return (
     <div class="stack">
-      <p class="muted small">Must-see closed, and the language reminder.</p>
+      <p class="muted small">An email when a must-see is closed on its day, and a reminder 3 days before to download the language.</p>
       <div class="row"><input class="field grow" type="email" inputMode="email" placeholder="you@example.com, partner@example.com" value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} /><button class="btn btn-primary btn-sm press" onClick={save}>Save</button></div>
       {msg && <p class="muted small">{msg}</p>}
     </div>
@@ -142,8 +144,10 @@ function Version() {
   const [state, setState] = useState<'idle' | 'checking' | 'latest'>('idle')
   useEffect(() => { if (state === 'latest') { const t = setTimeout(() => setState('idle'), 3000); return () => clearTimeout(t) } }, [state])
   return (
-    <button class="ver press" disabled={state === 'checking'} onClick={async () => { setState('checking'); if ((await updateNow()) === 'latest') setState('latest') }}>
-      v{__VERSION__} {state === 'checking' ? <Spinner /> : <Icon.refresh />}{state === 'checking' ? 'Checking… (reloads if there\'s a new version)' : state === 'latest' ? 'Up to date' : ''}
+    <button class="setrow press" disabled={state === 'checking'} onClick={async () => { setState('checking'); if ((await updateNow()) === 'latest') setState('latest') }}>
+      <span class="seticon">{state === 'checking' ? <Spinner /> : <Icon.refresh />}</span>
+      <span class="grow strong">Version {__VERSION__}</span>
+      <span class={`setval${state === 'latest' ? ' ok' : ''}`}>{state === 'checking' ? 'Checking…' : state === 'latest' ? <><Icon.check />Up to date</> : 'Check for update'}</span>
     </button>
   )
 }
@@ -158,23 +162,66 @@ function Kayak() {
   }
   return (
     <div class="stack">
-      <p class="muted small">KAYAK → Trips → Settings → Calendar sync → copy the link.</p>
+      <p class="muted small">Your KAYAK trips join the app. In KAYAK: Trips → Settings → Calendar sync → copy the link, then paste it here.</p>
       <div class="row"><input class="field grow" inputMode="url" placeholder="https://www.kayak.com/trips/ical/…" value={url} onInput={(e) => setUrl((e.target as HTMLInputElement).value)} /><button class="btn btn-primary btn-sm press" onClick={save}>Save</button></div>
       {msg && <p class="muted small">{msg}</p>}
     </div>
   )
 }
 
-export function AppSheet() {
+type Page = 'main' | 'me' | 'key' | 'family' | 'alerts' | 'kayak'
+const ago = (at?: number) => { if (!at) return 'not yet'; const m = Math.max(0, Math.round((Date.now() - at) / 60000)); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago` }
+
+/** One settings row: label, its state on the right (✓ when fine, gold when it needs you), chevron. */
+function Item({ icon, label, value, tone, onClick }: { icon: preact.JSX.Element; label: string; value: string; tone?: 'ok' | 'todo' | 'bad'; onClick: () => void }) {
+  return (
+    <button class="setrow press" onClick={onClick}>
+      <span class="seticon">{icon}</span>
+      <span class="grow strong">{label}</span>
+      <span class={`setval ${tone ?? ''}`}>{tone === 'ok' && <Icon.check />}{value}</span>
+      <Icon.chev />
+    </button>
+  )
+}
+
+/** ⚙ This app: what's set up at a glance, each setting one tap away. */
+export function AppSheet({ start }: { start?: 'key' } = {}) {
+  const s = settings.use()
+  const st = syncState.use()
+  const [page, setPage] = useState<Page>(start ?? 'main')
+  const back = () => setPage('main')
+  const linked = connected()
+  const scriptOld = linked && (st.script ?? 0) > 0 && (st.script ?? 0) < SCRIPT_NEEDED
+  const adults = new Set(Object.values(trips.get()).flatMap((t) => t.people.filter((p) => p.age >= 18).map((p) => p.name)).filter(Boolean)).size
+  const todo = [!s.geminiKey && 'Gemini', !DEMO && !linked && 'family sync', linked && st.error && 'sync', scriptOld && 'script update', adults > 1 && !s.me && 'this phone'].filter(Boolean) as string[]
+
+  if (page === 'me') return <Sheet title="This phone" onBack={back}><p class="muted small">Whose phone is this? Used for "Marie wants it" in Help me choose.</p><Me /></Sheet>
+  if (page === 'key') return <Sheet title="Gemini" onBack={back}><KeyBox /></Sheet>
+  if (page === 'family') return <Sheet title="Family sync" onBack={back}><Family /></Sheet>
+  if (page === 'alerts') return <Sheet title="Email alerts" onBack={back}><Alerts /></Sheet>
+  if (page === 'kayak') return <Sheet title="KAYAK calendar" onBack={back}><Kayak /></Sheet>
+
   return (
     <Sheet title="This app">
-      <div class="stack"><span class="label">This phone</span><Me /></div>
-      <div class="stack"><span class="label">Gemini key</span><KeyBox /></div>
-      <div class="stack"><span class="label">Family script</span><Family /></div>
-      <div class="stack"><span class="label">Email alerts</span><Alerts /></div>
-      <div class="stack"><span class="label">KAYAK (optional)</span><Kayak /></div>
-      <a class="link press" style={{ alignSelf: 'center' }} href="https://github.com/sachafontaine-cell/Travel-Sidekick#one-time-setup" target="_blank" rel="noopener">Setup guide<Icon.out /></a>
-      <Version />
+      <div class={`setstatus ${todo.length ? 'todo' : 'ok'}`}>
+        {todo.length ? <><b>{todo.length} thing{todo.length > 1 ? 's' : ''} to set up</b><span class="small">{todo.join(' · ')}</span></> : <><b><Icon.check />All set</b><span class="small">{DEMO ? 'Sample trip: nothing syncs.' : `Synced ${ago(st.at)} · script v${st.script ?? '?'}`}</span></>}
+      </div>
+
+      <div class="setgroup">
+        <Item icon={<Icon.chat />} label="Gemini (AI)" value={s.geminiKey ? 'Connected' : 'Add key'} tone={s.geminiKey ? 'ok' : 'todo'} onClick={() => setPage('key')} />
+        <Item icon={<Icon.refresh />} label="Family sync" value={DEMO ? 'Off (sample)' : !linked ? 'Not connected' : st.error ? 'Problem' : scriptOld ? 'Update needed' : `Synced ${ago(st.at)}`} tone={DEMO ? undefined : !linked ? 'todo' : st.error || scriptOld ? 'bad' : 'ok'} onClick={() => setPage('family')} />
+        <Item icon={<Icon.user />} label="This phone" value={s.me ?? (adults > 1 ? 'Choose' : '–')} tone={s.me ? undefined : adults > 1 ? 'todo' : undefined} onClick={() => setPage('me')} />
+      </div>
+
+      <div class="setgroup">
+        <Item icon={<Icon.mail />} label="Email alerts" value={s.alerts?.length ? `${s.alerts.length} address${s.alerts.length > 1 ? 'es' : ''}` : 'Off'} onClick={() => setPage('alerts')} />
+        <Item icon={<Icon.plan />} label="KAYAK calendar" value={s.kayak ? 'On' : 'Off'} onClick={() => setPage('kayak')} />
+      </div>
+
+      <div class="setgroup">
+        <Version />
+        <a class="setrow press" href="https://github.com/sachafontaine-cell/Travel-Sidekick#one-time-setup" target="_blank" rel="noopener"><span class="seticon"><Icon.out /></span><span class="grow strong">Setup guide</span><Icon.chev /></a>
+      </div>
     </Sheet>
   )
 }

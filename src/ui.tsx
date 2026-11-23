@@ -38,6 +38,8 @@ export const Icon = {
   search: () => svg(<><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></>),
   pin: () => svg(<><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.3" /></>),
   bulb: () => svg(<><path d="M9 18h6M10 21h4" /><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1.1 2V16h5v-.2c.1-.8.5-1.5 1.1-2A6 6 0 0 0 12 3z" /></>),
+  mail: () => svg(<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3.5 6.5l8.5 6.5 8.5-6.5" /></>),
+  user: () => svg(<><circle cx="12" cy="8" r="3.6" /><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" /></>),
   cloud: () => svg(<><path d="M7 17a4 4 0 1 1 1-7.9A5 5 0 0 1 17.5 10a3.5 3.5 0 0 1-.5 7z" /><path d="M9 20l-1 1.5M13 20l-1 1.5M17 20l-1 1.5" /></>),
 }
 
@@ -55,12 +57,12 @@ function useEscape(onClose: () => void) {
 }
 
 /** Slides up from the bottom; tap outside or ✕ to close. */
-export function Sheet({ title, children, foot, onClose = close }: { title: string; children: ComponentChildren; foot?: ComponentChildren; onClose?: () => void }) {
+export function Sheet({ title, children, foot, onClose = close, onBack }: { title: string; children: ComponentChildren; foot?: ComponentChildren; onClose?: () => void; onBack?: () => void }) {
   useEscape(onClose)
   return (
     <div class="scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div class="sheet" role="dialog" aria-modal="true" aria-label={title}>
-        <div class="sheet-head"><span class="grabber" /><div class="between"><h2 class="h2">{title}</h2><button class="iconbtn ring press" aria-label="Close" onClick={onClose}><Icon.x /></button></div></div>
+        <div class="sheet-head"><span class="grabber" /><div class="between"><div class="row" style={{ gap: '6px', minWidth: 0 }}>{onBack && <button class="iconbtn press" aria-label="Back" onClick={onBack}><Icon.back /></button>}<h2 class="h2 trunc">{title}</h2></div><button class="iconbtn ring press" aria-label="Close" onClick={onClose}><Icon.x /></button></div></div>
         <div class="sheet-body">{children}</div>
         {foot && <div class="sheet-foot">{foot}</div>}
       </div>

@@ -65,7 +65,7 @@ export function Ask({ trip, place }: { trip: Trip; place?: string }) {
         <button class="send press" aria-label="Send" disabled={!q.trim() || busy || !s.geminiKey} onClick={() => send(q)}><Icon.send /></button>
       </div>}>
       {p && <span class="chip ok" style={{ alignSelf: 'flex-start' }}>Looking at: {p.name}{p.day ? ` · Day ${p.day}` : ''}</span>}
-      {!s.geminiKey && <button class="btn btn-primary press" onClick={() => open({ kind: 'sheet', name: 'app' })}>Add the Gemini key</button>}
+      {!s.geminiKey && <button class="btn btn-primary press" onClick={() => open({ kind: 'sheet', name: 'app', arg: 'key' })}>Add the Gemini key</button>}
       {turns.length === 0 && s.geminiKey && <div class="chips">{chips.map((c) => <button class="pill press" onClick={() => send(c)}>{c}</button>)}</div>}
       {turns.map((t, i) => (
         <>

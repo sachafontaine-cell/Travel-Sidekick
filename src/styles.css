@@ -349,3 +349,21 @@ button.fact:disabled { opacity: 1; }
 .date.past { opacity: .55; }
 .date.on { background: var(--primary); border-color: var(--primary); opacity: 1; }
 .date.on .wd, .date.on b { color: var(--on-primary); }
+
+/* Settings, like iOS: a status line, then grouped rows with their state on the right */
+.setstatus { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 14px; }
+.setstatus b { display: inline-flex; align-items: center; gap: 6px; font-size: 17px; }
+.setstatus b svg { width: 18px; height: 18px; }
+.setstatus.ok { background: var(--success-bg); color: var(--success); }
+.setstatus.todo { background: var(--gold-bg); color: var(--gold-text); }
+.setgroup { display: flex; flex-direction: column; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; }
+.setrow { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 12px 0 14px; border-bottom: 1px solid var(--line); text-align: left; color: var(--text); text-decoration: none; width: 100%; }
+.setrow:last-child { border-bottom: 0; }
+.setrow > svg { width: 16px; height: 16px; color: var(--muted); flex-shrink: 0; }
+.seticon { width: 30px; height: 30px; border-radius: 8px; background: var(--tile); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.seticon svg { width: 17px; height: 17px; }
+.setval { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 15px; white-space: nowrap; }
+.setval svg { width: 15px; height: 15px; }
+.setval.ok { color: var(--success); }
+.setval.todo { color: var(--gold-text); font-weight: 600; }
+.setval.bad { color: var(--danger); font-weight: 600; }

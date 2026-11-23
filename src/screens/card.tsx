@@ -100,10 +100,11 @@ function Where({ p }: { p: Place }) {
 
 const tried = new Set<string>()
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
-/** 24-hour time as two pickers (hour, then minutes in 5s): phones' own time boxes may show AM/PM. */
+/** 24-hour time as two pickers (hour, then quarter hours): phones' own time boxes may show AM/PM. */
 function Clock24({ label, value, custom, onChange }: { label: string; value: number; custom: boolean; onChange: (v: number) => void }) {
   const h = Math.floor(value / 60) % 24, m = value % 60
-  const mins = [...new Set([...Array.from({ length: 12 }, (_, i) => i * 5), m])].sort((a, b) => a - b)
+  // Quarter hours (plus the planner's own time, if it's in between).
+  const mins = [...new Set([0, 15, 30, 45, m])].sort((a, b) => a - b)
   return (
     <span class={`clock24${custom ? ' custom' : ''}`} role="group" aria-label={label}>
       <select aria-label="Hour" value={h} onChange={(e) => onChange(Number((e.target as HTMLSelectElement).value) * 60 + m)}>{Array.from({ length: 24 }, (_, i) => <option value={i}>{pad(i)}</option>)}</select>

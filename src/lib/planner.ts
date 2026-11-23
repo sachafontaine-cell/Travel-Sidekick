@@ -2,7 +2,11 @@
 // Times are never stored: they are worked out from the order, bookings, opening hours, meals,
 // downtime and walking, every time something changes.
 import type { DayMeta, Place, Trip } from './model'
-import { km, leg, miles, type Leg, type Point } from './geo'
+import { km, leg as estimate, miles, type Leg, type Point } from './geo'
+import { knownLeg } from './legs'
+
+/** Google Maps time between two places when known, else the app's estimate. */
+const leg = (a: Point | undefined, b: Point | undefined, kids: boolean): Leg => knownLeg(a, b, kids) ?? estimate(a, b, kids)
 import { addDays, clock, daysBetween, weekday, WEEKDAY_LONG } from './time'
 import { groupLimit, youngKids } from './people'
 

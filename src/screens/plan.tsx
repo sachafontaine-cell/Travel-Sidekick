@@ -9,13 +9,14 @@ import { startDrag, swipeable } from '../lib/gestures'
 import { countdown, mustInfo } from '../lib/musts'
 import { dateOf, dayPlaces, tripDays, type Slot } from '../lib/planner'
 import { clock, WEEKDAY, WEEKDAY_LONG, weekday } from '../lib/time'
-import { legText } from '../lib/geo'
+import { legTextOf } from '../lib/geo'
+import { realLegs } from '../lib/legs'
 import { fitWanted, pendingFor, unfitIds } from './ideas'
 import { TripBar } from './tripbar'
 import type { Trip } from '../lib/model'
 
 export function Plan({ trip, day }: { trip: Trip; day: number }) {
-  places.use(); days.use(); trips.use(); unfitIds.use()
+  places.use(); days.use(); trips.use(); unfitIds.use(); realLegs.use()
   const n = tripDays(trip)
   const now = nowIn(trip)
   // Opens on today during the trip, else Day 1.
@@ -126,7 +127,7 @@ function SlotRow({ trip, s, first, past, onGrip }: { trip: Trip; s: Slot; first:
   // Bookings stay put: no swipe off the day, no drag (their time is fixed).
   const booked = !!s.place?.booked
   const sw = swipeable(s.place && !booked ? () => setDay(s.id, null) : undefined)
-  const travel = !first && s.travel.minutes > 0 ? legText(s.travel) : ''
+  const travel = !first && s.travel.minutes > 0 ? legTextOf(s.travel) : ''
   const name = s.place?.name ?? (s.kind === 'downtime' ? `Downtime · ${s.end - s.start} min` : 'Lunch (pick a spot nearby)')
   const sub = s.warn ?? (s.place?.booked ?? (s.kind === 'downtime' ? (trip.base ? `At ${trip.base.name}` : 'Rest nearby') : s.place ? `Worth ${s.place.worth}${s.wait && s.wait >= 15 ? ` · ${s.wait} min free before` : ''}` : ''))
   return (

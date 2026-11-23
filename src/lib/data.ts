@@ -1,5 +1,6 @@
 // All trip data lives on the phone and every screen reads it from memory. Every change goes
 // through `save`, which stamps it (who, when), keeps an Undo, and queues it for the other phone.
+import { realLegs } from './legs'
 import type { DayMeta, Energy, Place, Trip } from './model'
 import { createStore, DEMO, uid } from './store'
 import { localNow } from './time'
@@ -114,7 +115,7 @@ export function nowIn(trip: Trip): { date: string; min: number; day: number } {
 // Plans are cheap, but every screen asks for them: keep the last result per trip.
 const planCache = new Map<string, { key: unknown[]; plans: DayPlan[] }>()
 export function plansFor(trip: Trip): DayPlan[] {
-  const key = [trip, places.get(), days.get()]
+  const key = [trip, places.get(), days.get(), realLegs.get()]
   const hit = planCache.get(trip.id)
   if (hit && hit.key.every((k, i) => k === key[i])) return hit.plans
   const plans = planAll(trip, tripPlaces(trip.id), days.get())

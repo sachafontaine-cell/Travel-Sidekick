@@ -1,7 +1,7 @@
 // Quiet work while the app is open: exchange rate, weather, must-see hours, local rules.
 // Nothing here blocks a screen; results just appear.
 import { DEMO } from './store'
-import { places, save, settings, trips, tripPlaces, nowIn } from './data'
+import { places, plansFor, save, settings, trips, tripPlaces, nowIn } from './data'
 import { route } from './nav'
 import { fetchRate } from './money'
 import { refreshWeather } from './weather'
@@ -10,6 +10,7 @@ import { dateOf, tripDays } from './planner'
 import type { Place, Trip } from './model'
 import { findPhotos, wantsPhoto } from './photos'
 import { locateAll } from './locate'
+import { fetchLegs } from './legs'
 
 // Each job runs one at a time, and at most every `every` ms, even when it fails (no retry storm
 // while you move between screens; it tries again later).
@@ -77,6 +78,8 @@ function run() {
   void once('hours' + trip.id, () => hoursJob(trip), 3 * 3600000)
   void once('photos' + trip.id, () => photosJob(trip), 5 * 60000)
   void once('locate' + trip.id, () => (DEMO ? Promise.resolve() : locateAll(trip)), 2 * 60000)
+  // Real travel times between stops for today and the next 3 days (after locations are checked).
+  void once('legs' + trip.id, () => (DEMO ? Promise.resolve() : fetchLegs(trip, plansFor(trip), now.day)), 3 * 60000)
   void once('rules' + trip.id, async () => {
     if (DEMO || !trip.built || trip.rules?.length || !settings.get().geminiKey) return
     const rules = await localRules(trip)

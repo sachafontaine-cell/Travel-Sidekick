@@ -15,7 +15,8 @@ import { tripDays } from '../lib/planner'
 import { langName } from '../lib/money'
 import type { Energy, Trip } from '../lib/model'
 import { Photos } from './card'
-import { legText } from '../lib/geo'
+import { legText, legTextOf } from '../lib/geo'
+import { realLegs } from '../lib/legs'
 import { TripBar } from './tripbar'
 
 export const translateUrl = (t: Trip) => `https://translate.google.com/?sl=${t.dest.lang}&tl=en&op=translate`
@@ -57,7 +58,7 @@ function MustLine({ trip, today, now }: { trip: Trip; today: number; now: number
 }
 
 export function Today({ trip }: { trip: Trip }) {
-  places.use(); trips.use()
+  places.use(); trips.use(); realLegs.use()
   const s = settings.use()
   const wx = weather.use()[trip.id]
   const now = nowIn(trip)
@@ -124,7 +125,7 @@ export function Today({ trip }: { trip: Trip }) {
           <span class="label">{next.start <= now.min ? 'Now' : 'Next up'} · {clock(next.start)}</span>
           <span class="h2">{next.place?.name ?? (next.kind === 'downtime' ? 'Downtime' : 'Lunch')}</span>
           {leaveBy != null && (
-            <span class="leave"><b>Leave by {clock(leaveBy)}</b><span class="muted small">{legText(next.travel)} + {kidBuffer(trip)} min kid buffer</span></span>
+            <span class="leave"><b>Leave by {clock(leaveBy)}</b><span class="muted small">{legTextOf(next.travel)} + {kidBuffer(trip)} min kid buffer</span></span>
           )}
         </button>
       ) : (

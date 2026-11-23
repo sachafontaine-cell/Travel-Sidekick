@@ -4,7 +4,8 @@
 
 export interface Point { lat: number; lng: number }
 export type Mode = 'walk' | 'transit' | 'car'
-export interface Leg { minutes: number; walkKm: number; mode: Mode; km: number }
+/** real = Google Maps time; otherwise the app's own estimate. */
+export interface Leg { minutes: number; walkKm: number; mode: Mode; km: number; real?: boolean }
 
 export const KM_PER_MI = 1.609344
 
@@ -51,5 +52,7 @@ export function pick(o: Partial<Record<Mode, number>>): { mode: Mode; minutes: n
 export const MODE_NAME: Record<Mode, string> = { walk: 'walk', transit: 'transit', car: 'by car' }
 /** "12 min walk", "25 min by car". */
 export const legText = (l: Pick<Leg, 'minutes' | 'mode'>) => `${l.minutes} min ${MODE_NAME[l.mode]}`
+/** "≈22 min by car" for the app's estimate, "22 min by car" for a Google Maps time. */
+export const legTextOf = (l: Leg) => `${l.real ? '' : '≈'}${legText(l)}`
 
 export const miles = (km: number) => km / KM_PER_MI

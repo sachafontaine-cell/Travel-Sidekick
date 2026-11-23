@@ -212,3 +212,34 @@ describe('planner never goes back in time (random days)', () => {
     expect(bad.slice(0, 5)).toEqual([])
   })
 })
+
+describe('the Cabo day from the screenshot', () => {
+  it('snorkel at 11:00, your own 14:00 for Acre Baja, then Flora Farms: in order, downtime after', () => {
+    const { trip, places } = demoTrip()
+    const t = { ...trip, downtime: { on: true, minutes: 150 } }
+    const b = trip.base!
+    const mk = (id: string, name: string, dLat: number, fixed: number | null, minutes: number, rank: string, booked?: string) => ({ ...places[0], id, name, lat: b.lat + dLat, lng: b.lng, day: 5, dayRank: rank, fixed, booked, hours: undefined, minutes, kind: 'sight' as const, must: false })
+    const plan = planDay(t, 5, [mk('s', 'Snorkel', 0.05, 11 * 60, 165, 'a'), mk('a', 'Acre Baja', 0.06, 14 * 60, 120, 'b'), mk('f', 'Flora Farms', 0.065, null, 120, 'c')])
+    const starts = plan.slots.map((s) => s.start)
+    expect([...starts].sort((x, y) => x - y)).toEqual(starts)
+    expect(clock(plan.slots.find((s) => s.id === 'a')!.start)).toBe('14:00')
+    const dt = plan.slots.find((s) => s.kind === 'downtime')
+    if (dt) expect(dt.start).toBeGreaterThanOrEqual(plan.slots.find((s) => s.id === 'a')!.end)
+  })
+})
+
+describe('real travel times between stops', () => {
+  it('uses the Google Maps time once known (and says so), else the estimate', async () => {
+    const { realLegs, legKey } = await import('./legs')
+    const { trip, places } = demoTrip()
+    const b = trip.base!
+    const a = { ...places[0], id: 'x', lat: b.lat + 0.05, lng: b.lng, day: 2, dayRank: 'a', fixed: null, booked: undefined, hours: undefined, minutes: 60 }
+    const c = { ...places[0], id: 'y', lat: b.lat + 0.06, lng: b.lng + 0.02, day: 2, dayRank: 'b', fixed: null, booked: undefined, hours: undefined, minutes: 60 }
+    const before = planDay(trip, 2, [a, c]).slots.find((s) => s.id === 'y')!.travel
+    expect(before.real).toBeFalsy()
+    realLegs.set({ [legKey(a, c)]: { walk: 70, car: 31, km: 3.1 } })
+    const after = planDay(trip, 2, [a, c]).slots.find((s) => s.id === 'y')!.travel
+    expect(after).toMatchObject({ minutes: 31, mode: 'car', real: true })
+    realLegs.set({})
+  })
+})

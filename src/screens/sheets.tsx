@@ -183,12 +183,14 @@ export function DaySheet({ trip, id }: { trip: Trip; id: string }) {
       <div class="list">
         {Array.from({ length: n - first + 1 }, (_, i) => i + first).map((d) => {
           const date = dateOf(trip, d)
-          const closed = hoursOn(p, date) === null || (p.fixed != null && !!p.booked && p.day != null && p.day !== d)
+          // Only another day's booking is off limits; "closed" is a warning (the hours can be wrong).
+          const locked = p.fixed != null && !!p.booked && p.day != null && p.day !== d
+          const closed = hoursOn(p, date) === null
           const pl = planDay(trip, d, tripPlaces(trip.id))
           return (
-            <button class="kv press" disabled={closed} style={closed ? { opacity: 0.5 } : undefined} onClick={() => { setDay(p.id, d); close() }}>
+            <button class="kv press" disabled={locked} style={locked ? { opacity: 0.5 } : undefined} onClick={() => { setDay(p.id, d); close() }}>
               <span><b>{d === first && nowIn(trip).day === d ? 'Today' : `Day ${d}`}</b> · {WEEKDAY[weekday(date)]} {shortDate(date)}</span>
-              <span class="v">{p.day === d ? <span class="chip ok">Here</span> : p.fixed != null && p.booked ? 'Booked on another day' : closed ? 'Closed' : (() => { const k = pl.slots.filter((s) => s.kind === 'place').length; return k ? `${k} stop${k === 1 ? '' : 's'}` : 'Free' })()}</span>
+              <span class="v">{p.day === d ? <span class="chip ok">Here</span> : p.fixed != null && p.booked ? 'Booked on another day' : closed ? <span class="warn-text">Closed?</span> : (() => { const k = pl.slots.filter((s) => s.kind === 'place').length; return k ? `${k} stop${k === 1 ? '' : 's'}` : 'Free' })()}</span>
             </button>
           )
         })}

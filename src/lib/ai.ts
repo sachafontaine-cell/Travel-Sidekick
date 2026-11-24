@@ -62,14 +62,35 @@ interface RawPlace { name: string; kind: Kind; lat: number; lng: number; badge: 
 const KINDS: Kind[] = ['sight', 'museum', 'outdoors', 'tour', 'kids', 'meal', 'snack', 'show', 'shop', 'other']
 const clamp = (n: unknown, lo = 0, hi = 10) => Math.min(hi, Math.max(lo, Number(n) || 0))
 
-function parseHours(h?: string[]): Hours | undefined {
+/** "09:00", "9am", "5:30 PM" → minutes. */
+function clock12(s: string): number | null {
+  const m = /^\s*(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\s*$/i.exec(s)
+  if (!m) return parseClock(s)
+  let h = Number(m[1]) % 24
+  const ap = m[3]?.[0].toLowerCase()
+  if (ap === 'p' && h < 12) h += 12
+  if (ap === 'a' && h === 12) h = 0
+  return h * 60 + Number(m[2] ?? 0)
+}
+
+/**
+ * Opening hours from Gemini. Only an explicit "closed" means closed: anything it can't read
+ * ("varies", "tours at 8:00 and 12:00") makes the hours unknown, never closed.
+ */
+export function parseHours(h?: string[]): Hours | undefined {
   if (!Array.isArray(h) || h.length !== 7) return undefined
-  const week = h.map((d) => {
-    if (!d || /closed/i.test(d)) return null
-    const [a, b] = d.split('-').map((x) => parseClock(x))
-    if (a == null || b == null) return null
-    return [a, b <= a ? 1440 : b] as [number, number]
-  })
+  const week: ([number, number] | null)[] = []
+  for (const d of h) {
+    const t = String(d ?? '').trim()
+    if (/^closed$/i.test(t)) { week.push(null); continue }
+    if (/24\s*h|24 hours|open all day/i.test(t)) { week.push([0, 1440]); continue }
+    const parts = t.split(/\s*[-–—]\s*|\s+to\s+/i)
+    const a = parts.length === 2 ? clock12(parts[0]) : null, b = parts.length === 2 ? clock12(parts[1]) : null
+    if (a == null || b == null) return undefined
+    week.push([a, b <= a ? 1440 : b])
+  }
+  // "Closed" every day is a misreading (it wouldn't be suggested), not a fact.
+  if (week.every((x) => x === null)) return undefined
   return { week, source: 'ai' }
 }
 

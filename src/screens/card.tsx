@@ -201,7 +201,10 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
       {!ticket && (
         <div class="between small hoursline">
           <span>{h === undefined ? 'Hours not known' : h === null ? <b class="warn-text">Closed {day ? `on Day ${day}` : 'today'}</b> : <>Open <b>{clock(h[0])}–{clock(h[1])}</b> {day ? `on Day ${day}` : 'today'}</>}</span>
-          <a class="link small press" href={maps} target="_blank" rel="noopener">Check<Icon.out /></a>
+          <span class="row" style={{ gap: '12px' }}>
+            {h !== undefined ? <button class="link small press" onClick={() => { const { hours: _, ...rest } = p; save('place', [rest], 'Hours cleared: the planner won\'t warn about them') }}>Not right?</button> : null}
+            <a class="link small press" href={maps} target="_blank" rel="noopener">Check<Icon.out /></a>
+          </span>
         </div>
       )}
       <Stepper label="Time there" hint={`(suggested ${duration(p.suggested)})`} value={p.minutes} show={duration} step={15} min={15} max={600} custom={p.minutes !== p.suggested} onChange={(v) => setMinutes(p.id, v)} />

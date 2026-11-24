@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { between, spread } from './rank'
 import { minus, plus } from './vibes'
 import { demoTrip } from './demo'
-import { planAll, planDay, dayIndex, tripDays } from './planner'
+import { planAll, planDay, dayIndex, tripDays, hoursOn } from './planner'
 import { countdown, mustInfo } from './musts'
 import { planChecked, rebalance, slotBookings } from './rebalance'
 import { gapNow, ideas } from './whatnow'
@@ -241,5 +241,20 @@ describe('real travel times between stops', () => {
     const after = planDay(trip, 2, [a, c]).slots.find((s) => s.id === 'y')!.travel
     expect(after).toMatchObject({ minutes: 31, mode: 'car', real: true })
     realLegs.set({})
+  })
+})
+
+describe('opening hours from Gemini', () => {
+  it('reads AM/PM and 24 hours; anything unreadable is unknown, never "closed"', async () => {
+    const { parseHours } = await import('./ai')
+    expect(parseHours(Array(7).fill('8:00 AM - 5:00 PM'))?.week[1]).toEqual([480, 1020])
+    expect(parseHours(Array(7).fill('Open 24 hours'))?.week[0]).toEqual([0, 1440])
+    expect(parseHours(Array(7).fill('Tours at 8:00 and 12:00'))).toBeUndefined()
+    expect(parseHours(Array(7).fill('closed'))).toBeUndefined()
+    expect(parseHours(['closed', ...Array(6).fill('09:00-17:00')])?.week[0]).toBeNull()
+  })
+  it('a place saved as closed all week counts as unknown', () => {
+    const p = { hours: { week: Array(7).fill(null), source: 'ai' } } as unknown as Place
+    expect(hoursOn(p, '2026-11-25')).toBeUndefined()
   })
 })

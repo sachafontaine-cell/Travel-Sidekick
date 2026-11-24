@@ -59,6 +59,8 @@ export function hoursOn(p: Place, date: string): [number, number] | null | undef
   if (!p.hours) return undefined
   if (p.hours.dates && date in p.hours.dates) return p.hours.dates[date]
   if (!p.hours.week) return undefined
+  // Saved before hours were read carefully: "closed" all week means unknown.
+  if (p.hours.week.every((x) => x === null)) return undefined
   return p.hours.week[weekday(date)] ?? null
 }
 

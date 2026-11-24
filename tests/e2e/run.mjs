@@ -226,6 +226,28 @@ await test('sample trip: Decide one by one: Want, Undo, Skip; room left', async 
   await p.context().close()
 })
 
+await test('sample trip: write in your own activity: day, time, length, note; no score', async () => {
+  const p = await page()
+  await p.goto(BASE + '?demo#/t/demo-paris/plan/5')
+  await p.getByRole('button', { name: 'Add to this day' }).click()
+  await p.getByRole('button', { name: 'Write in your own…' }).click()
+  const d = p.getByRole('dialog', { name: 'New activity' })
+  await d.getByPlaceholder(/What\?/).fill("Dinner at Tía's")
+  await d.getByRole('button', { name: /Any time/ }).click()
+  await d.getByLabel('Hour').selectOption('19')
+  await d.getByLabel('Minutes').selectOption('30')
+  await d.getByPlaceholder('Notes (optional)').fill('Bring the wine')
+  await d.getByRole('button', { name: 'Add', exact: true }).click()
+  await p.getByText(/Dinner at Tía's added to Day 5 at 19:30/).waitFor()
+  const row = p.locator('.slot', { hasText: "Dinner at Tía's" })
+  expect((await row.locator('.t').innerText()).trim() === '19:30', 'at the time you set')
+  expect((await row.innerText()).includes('Bring the wine'), 'your note shows')
+  await row.locator('.open').click()
+  expect(!(await p.getByRole('dialog').innerText()).includes('/10'), 'no score on your own activity')
+  expect(p.errors.length === 0, 'no console errors: ' + p.errors.join(' | '))
+  await p.context().close()
+})
+
 await test('sample trip: Map: filter first, then pins; a pin opens a summary and the card', async () => {
   const p = await page()
   await p.goto(BASE + '?demo#/t/demo-paris/ideas')

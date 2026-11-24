@@ -392,3 +392,4 @@ button.fact:disabled { opacity: 1; }
 .slot.done .name { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--muted); }
 @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.18); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .cross.on > span { animation: none; } }
+.facts3.own { grid-template-columns: 1fr; }

@@ -112,7 +112,7 @@ function List({ trip }: { trip: Trip }) {
       <div class="listhead">
         <span class="grow stack" style={{ gap: '1px' }}><b>{wanted} wanted</b><span class={`small ${cap.left < -60 ? 'warn-text' : 'muted'}`}>{capacityText(cap)}</span></span>
         <button class={`iconbtn ring press${custom ? ' on' : ''}`} aria-label="Sort & filter" onClick={() => open({ kind: 'sheet', name: 'filter' })}><Icon.filter /></button>
-        <button class="iconbtn ring press" aria-label="Add a place" onClick={() => open({ kind: 'sheet', name: 'add', arg: trip.id })}><Icon.plus /></button>
+        <button class="iconbtn ring press" aria-label="New activity" onClick={() => open({ kind: 'sheet', name: 'add', arg: trip.id })}><Icon.plus /></button>
       </div>
       {list.length > 0 ? <div class="list">{list.map((p) => <Row trip={trip} p={p} />)}</div> : (
         <div class="empty">
@@ -205,7 +205,7 @@ function Row({ trip, p }: { trip: Trip; p: Place }) {
       <Tick p={p} />
       <button class="open press" onClick={() => open({ kind: 'card', place: p.id })}>
         <span class="line1">{p.must && <span class="star" aria-label="Must-see">★</span>}<span class="name">{p.name}</span>{p.day ? <span class="when">{p.done ? 'Done' : `Day ${p.day}`}</span> : unfit ? <span class="when warn-text">No room</span> : null}</span>
-        <span class="meta"><span class="dot" style={{ background: GROUP_COLOR[g] }} />{p.fresh && <span class="chip ok">New</span>}{p.badge === 'trap' && <span class="chip trap">Trap</span>}{p.scoring ? 'Scoring…' : `${p.worth}/10 · ${short(trip, p.price)}${t ? ` · ${t.real ? '' : '≈'}${legText(t)}` : ''}`}</span>
+        <span class="meta"><span class="dot" style={{ background: GROUP_COLOR[g] }} />{p.fresh && <span class="chip ok">New</span>}{p.badge === 'trap' && <span class="chip trap">Trap</span>}{p.scoring ? 'Scoring…' : p.own ? `Your plan${t ? ` · ${t.real ? '' : '≈'}${legText(t)}` : ''}` : `${p.worth}/10 · ${short(trip, p.price)}${t ? ` · ${t.real ? '' : '≈'}${legText(t)}` : ''}`}</span>
       </button>
     </div>
   )

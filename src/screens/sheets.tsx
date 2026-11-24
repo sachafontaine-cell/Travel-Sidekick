@@ -1,6 +1,8 @@
 // Small sheets: sort & filter, add a place, add to a day, pick a day, local rules.
 import { useEffect, useState } from 'preact/hooks'
-import { Icon, Sheet, Spinner } from '../ui'
+import { Icon, Sheet, Spinner, Stepper } from '../ui'
+import { Clock24 } from './card'
+import { findAddress } from '../lib/weather'
 import { nowIn, places, save, tripPlaces, trips } from '../lib/data'
 import { close, open } from '../lib/nav'
 import { createStore } from '../lib/store'
@@ -12,7 +14,7 @@ import { here, locate } from '../lib/here'
 import { between, byRank } from '../lib/rank'
 import { dateOf, dayPlaces, hoursOn, planDay, tripDays } from '../lib/planner'
 import { km } from '../lib/geo'
-import { shortDate, WEEKDAY, weekday } from '../lib/time'
+import { clock, duration, shortDate, WEEKDAY, weekday } from '../lib/time'
 import { symbol } from '../lib/money'
 import type { Place, Trip } from '../lib/model'
 
@@ -40,35 +42,89 @@ export function FilterSheet({ trip }: { trip: Trip }) {
   )
 }
 
-export function AddSheet({ trip, day }: { trip: Trip; day?: number }) {
+/**
+ * + Add: your own activity, written in by hand (name, day, time, length, where, note), with no
+ * score and no Gemini. Or, for a place you heard about, "Look it up" and Gemini scores it.
+ */
+export function AddSheet({ trip, day: day0 }: { trip: Trip; day?: number }) {
+  const now = nowIn(trip)
+  const n = tripDays(trip)
+  const first = Math.max(1, now.day)
   const [name, setName] = useState('')
-  const add = async (status: 'picked' | 'maybe') => {
-    const n = name.trim()
-    if (!n) return
-    // In the list at once ("Scoring…"); Gemini fills it in a few seconds.
-    const last = tripPlaces(trip.id).sort(byRank).at(-1)
-    const rank = between(last?.rank, undefined)
+  const [day, setDayN] = useState<number | null>(day0 ?? null)
+  const [time, setTime] = useState<number | null>(null)
+  const [minutes, setMinutes] = useState(60)
+  const [where, setWhere] = useState('')
+  const [spot, setSpot] = useState<{ name: string; lat: number; lng: number } | null>(null)
+  const [hits, setHits] = useState<{ name: string; lat: number; lng: number }[]>([])
+  const [note, setNote] = useState('')
+  useEffect(() => {
+    const q = where.trim()
+    if (q.length < 3 || spot?.name === q) { setHits([]); return }
+    const t = setTimeout(() => { void findAddress(q, trip.dest).then(setHits).catch(() => setHits([])) }, 450)
+    return () => clearTimeout(t)
+  }, [where])
+
+  const rankAfter = () => between(tripPlaces(trip.id).sort(byRank).at(-1)?.rank, undefined)
+  /** Your own: saved as written, on the day and time you chose. */
+  const addOwn = () => {
+    const nm = name.trim()
+    if (!nm) return
+    const at = spot ?? trip.base ?? trip.dest
     const onDay = day ? dayPlaces(tripPlaces(trip.id), day).at(-1) : undefined
-    const temp: Place = { id: crypto.randomUUID(), trip: trip.id, name: n, kind: 'sight', lat: trip.base?.lat ?? trip.dest.lat, lng: trip.base?.lng ?? trip.dest.lng, badge: 'worth', must: false, worth: 0, value: 0, sub: { iconic: 0, vibe: 0, hassle: 0, kid: 0 }, rec: 'pay', recText: '', why: '', tip: '', price: 0, minutes: 60, suggested: 60, indoor: false, status, rank, day: day ?? null, dayRank: day ? between(onDay?.dayRank, undefined) : undefined, scoring: true, at: Date.now() }
-    save('place', [temp], `${n} added`)
+    const p: Place = {
+      id: crypto.randomUUID(), trip: trip.id, name: nm, kind: 'other', own: true, scoreV: 2, lat: at.lat, lng: at.lng, badge: 'worth', must: false,
+      worth: 0, value: 0, sub: { iconic: 0, vibe: 0, hassle: 0, kid: 0 }, rec: 'pay', recText: '', why: '', tip: '', desc: note.trim() || undefined,
+      price: 0, minutes, suggested: minutes, indoor: false, status: 'picked', rank: rankAfter(), day, dayRank: day ? between(onDay?.dayRank, undefined) : undefined,
+      fixed: day && time != null ? time : null, loc: { src: spot ? 'osm' : 'none', address: spot?.name ?? (trip.base ? trip.base.name : undefined), at: Date.now() }, at: Date.now(),
+    }
+    save('place', [p], day ? `${nm} added to Day ${day}${time != null ? ` at ${clock(time)}` : ''}` : `${nm} added`)
+    close()
+  }
+  /** A place you heard about: in the list at once ("Scoring…"); Gemini fills it in a few seconds. */
+  const lookUp = async () => {
+    const nm = name.trim()
+    if (!nm) return
+    const rank = rankAfter()
+    const onDay = day ? dayPlaces(tripPlaces(trip.id), day).at(-1) : undefined
+    const temp: Place = { id: crypto.randomUUID(), trip: trip.id, name: nm, kind: 'sight', lat: trip.base?.lat ?? trip.dest.lat, lng: trip.base?.lng ?? trip.dest.lng, badge: 'worth', must: false, worth: 0, value: 0, sub: { iconic: 0, vibe: 0, hassle: 0, kid: 0 }, rec: 'pay', recText: '', why: '', tip: '', price: 0, minutes, suggested: minutes, indoor: false, status: 'picked', rank, day, dayRank: day ? between(onDay?.dayRank, undefined) : undefined, fixed: day && time != null ? time : null, scoring: true, at: Date.now() }
+    save('place', [temp], `${nm} added: looking it up`)
     close()
     try {
-      const p = await scorePlace(trip, n, rank)
+      const p = await scorePlace(trip, nm, rank)
       const cur = places.get()[temp.id]
-      if (p && cur) save('place', [{ ...p, id: temp.id, status: cur.status, day: cur.day, dayRank: cur.dayRank, scoring: false }])
+      if (p && cur) save('place', [{ ...p, id: temp.id, status: cur.status, day: cur.day, dayRank: cur.dayRank, fixed: cur.fixed, minutes: cur.minutes, scoring: false }])
     } catch (e) {
       const cur = places.get()[temp.id]
       if (cur) save('place', [{ ...cur, scoring: false, why: e instanceof Error ? `Not scored: ${e.message}` : 'Not scored yet.' }])
     }
   }
+  const days = Array.from({ length: Math.max(0, n - first + 1) }, (_, i) => i + first)
   return (
-    <Sheet title={day ? `Add to Day ${day}` : 'Add a place'}>
-      <input class="field" autoFocus enterKeyHint="done" placeholder="Name, e.g. Musée Grévin" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') void add('picked') }} />
-      <div class="row">
-        <button class="btn btn-primary grow press" disabled={!name.trim()} onClick={() => add('picked')}>{day ? `Add to Day ${day}` : 'Add, checked'}</button>
-        {!day && <button class="btn btn-quiet press" disabled={!name.trim()} onClick={() => add('maybe')}>Unchecked</button>}
+    <Sheet title="New activity">
+      <input class="field" autoFocus enterKeyHint="next" placeholder="What? e.g. Dinner at Tía's, beach morning" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
+      <div class="stack" style={{ gap: '6px' }}>
+        <span class="label">Day</span>
+        <div class="strip chipstrip">
+          <button class={`pill press${day == null ? ' on' : ''}`} onClick={() => setDayN(null)}>No day yet</button>
+          {days.map((d) => <button class={`pill press${day === d ? ' on' : ''}`} onClick={() => setDayN(d)}>{d === now.day ? 'Today' : `${WEEKDAY[weekday(dateOf(trip, d))]} ${Number(dateOf(trip, d).slice(8))}`}</button>)}
+        </div>
       </div>
-      <p class="muted small">Gemini scores it in a few seconds.</p>
+      {day != null && (
+        <div class="timerow">
+          <span class="grow strong">Start</span>
+          {time == null ? <button class="btn btn-quiet btn-sm press" onClick={() => setTime(Math.max(trip.dayStart, 9 * 60))}>Any time · set one</button>
+            : <><Clock24 label="Start time" value={time} custom onChange={setTime} /><button class="link small press" onClick={() => setTime(null)}>Any time</button></>}
+        </div>
+      )}
+      <Stepper label="How long" value={minutes} show={duration} step={15} min={15} max={720} onChange={setMinutes} />
+      <div class="stack" style={{ gap: '6px' }}>
+        <input class="field" placeholder={`Where? (optional${trip.base ? ', blank = home' : ''})`} value={where} onInput={(e) => { setWhere((e.target as HTMLInputElement).value); setSpot(null) }} />
+        {hits.length > 0 && !spot && <div class="list">{hits.map((h) => <button class="kv press" onClick={() => { setSpot(h); setWhere(h.name); setHits([]) }}><span>{h.name}</span></button>)}</div>}
+      </div>
+      <textarea class="field" style={{ minHeight: '64px', paddingTop: '10px' }} placeholder="Notes (optional)" value={note} onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)} />
+      <button class="btn btn-primary press" disabled={!name.trim()} onClick={addOwn}>Add</button>
+      <button class="link press" style={{ alignSelf: 'center' }} disabled={!name.trim()} onClick={() => void lookUp()}>It's a place: look it up with Gemini</button>
     </Sheet>
   )
 }
@@ -101,7 +157,7 @@ export function AddToDaySheet({ trip, day }: { trip: Trip; day: number }) {
           })}
         </div>
       )}
-      <button class="link press" onClick={() => { close(); setTimeout(() => open({ kind: 'sheet', name: 'add', arg: trip.id + '|' + day }), 0) }}>Something else…</button>
+      <button class="link press" onClick={() => { close(); setTimeout(() => open({ kind: 'sheet', name: 'add', arg: trip.id + '|' + day }), 0) }}>Write in your own…</button>
     </Sheet>
   )
 }

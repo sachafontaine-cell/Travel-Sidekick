@@ -17,7 +17,7 @@ export async function refreshList(id: string): Promise<void> {
   if (!t || !stale(t) || refreshing.get()[id] === 'busy' || !settings.get().geminiKey) return
   refreshing.set({ ...refreshing.get(), [id]: 'busy' })
   const key = listKey(t)
-  const mine = tripPlaces(id).filter((p) => !p.booked && !p.scoring)
+  const mine = tripPlaces(id).filter((p) => !p.booked && !p.scoring && !p.own)
   const byName = new Map(mine.map((p) => [p.name.toLowerCase(), p]))
   let rank = tripPlaces(id).sort(byRank).at(-1)?.rank
   let added = 0

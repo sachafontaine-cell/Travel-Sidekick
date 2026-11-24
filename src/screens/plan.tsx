@@ -140,7 +140,7 @@ function SlotRow({ trip, s, first, past, onGrip }: { trip: Trip; s: Slot; first:
   const sw = swipeable(s.place && !booked ? () => setDay(s.id, null) : undefined)
   const travel = !first && s.travel.minutes > 0 ? legTextOf(s.travel) : ''
   const name = s.place?.name ?? (s.kind === 'downtime' ? `Downtime · ${s.end - s.start} min` : 'Lunch (pick a spot nearby)')
-  const sub = s.warn ?? (s.place?.booked ?? (s.kind === 'downtime' ? (trip.base ? `At ${trip.base.name}` : 'Rest nearby') : s.place ? `Worth ${s.place.worth}${s.wait && s.wait >= 15 ? ` · ${s.wait} min free before` : ''}` : ''))
+  const sub = s.warn ?? (s.place?.booked ?? (s.kind === 'downtime' ? (trip.base ? `At ${trip.base.name}` : 'Rest nearby') : s.place ? `${s.place.own ? (s.place.desc ?? 'Your plan') : `Worth ${s.place.worth}`}${s.wait && s.wait >= 15 ? ` · ${s.wait} min free before` : ''}` : ''))
   return (
     <div class={`slot${s.kind !== 'place' ? ' rest' : ''}${s.place?.done ? ' done' : ''}`} data-drag data-left="Off this day" {...sw} style={past && !s.place?.done ? { opacity: 0.6 } : undefined}>
       {s.place && !(booked && s.place.kind === 'other')

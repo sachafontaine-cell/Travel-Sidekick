@@ -5,7 +5,7 @@ import { describeMany, groupKey } from './ai'
 import type { Place, Trip } from './model'
 
 const asked = new Set<string>()
-export const needsAbout = (trip: Trip, p: Place) => !p.scoring && !(p.booked && p.kind === 'other') && (!p.desc || !p.good || p.descFor !== groupKey(trip))
+export const needsAbout = (trip: Trip, p: Place) => !p.own && !p.scoring && !(p.booked && p.kind === 'other') && (!p.desc || !p.good || p.descFor !== groupKey(trip))
 
 export async function fillAbout(trip: Trip, list: Place[]): Promise<void> {
   if (!settings.get().geminiKey) return

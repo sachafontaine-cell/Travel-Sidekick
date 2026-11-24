@@ -26,7 +26,7 @@ export function ReviewSheet({ trip }: { trip: Trip }) {
   const [added, setAdded] = useState<string[]>([])
 
   useEffect(() => {
-    const list = tripPlaces(trip.id).filter((p) => p.status !== 'out' && !(p.booked && p.kind === 'other'))
+    const list = tripPlaces(trip.id).filter((p) => p.status !== 'out' && !p.own && !(p.booked && p.kind === 'other'))
     const got: Review[] = []
     reviewList(trip, list, (r) => {
       // Missing ones already in the list (under another name) aren't missing.

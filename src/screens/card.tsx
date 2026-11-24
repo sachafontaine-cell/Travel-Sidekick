@@ -101,7 +101,7 @@ function Where({ p }: { p: Place }) {
 const tried = new Set<string>()
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 /** 24-hour time as two pickers (hour, then quarter hours): phones' own time boxes may show AM/PM. */
-function Clock24({ label, value, custom, onChange }: { label: string; value: number; custom: boolean; onChange: (v: number) => void }) {
+export function Clock24({ label, value, custom, onChange }: { label: string; value: number; custom: boolean; onChange: (v: number) => void }) {
   const h = Math.floor(value / 60) % 24, m = value % 60
   // Quarter hours (plus the planner's own time, if it's in between).
   const mins = [...new Set([0, 15, 30, 45, m])].sort((a, b) => a - b)
@@ -148,7 +148,7 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
           {ticket ? <p class="muted">{p.booked}{p.why ? ` · ${p.why}` : ''}</p> : (
             <div class="row" style={{ flexWrap: 'wrap', gap: '6px' }}>
               {p.must && <span class="chip star"><Icon.star />Must-see</span>}
-              <span class="muted small"><span class="dot" style={{ background: GROUP_COLOR[g] }} /> {GROUP_NAME[g]}</span>
+              <span class="muted small"><span class="dot" style={{ background: GROUP_COLOR[g] }} /> {p.own ? 'Your plan' : GROUP_NAME[g]}</span>
               {p.badge !== 'worth' && <BadgeFull p={p} />}
               {p.done && <span class="chip plain">Done</span>}
               <Where p={p} />
@@ -160,11 +160,11 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
       </div>
 
       {!ticket && (p.scoring ? <p class="muted">Scoring… a few seconds.</p> : <>
-        <div class="facts3">
-          <button class={`fact press${open2 === 'why' ? ' on' : ''}`} aria-expanded={open2 === 'why'} onClick={() => toggle('why')}>
+        <div class={`facts3${p.own ? ' own' : ''}`}>
+          {!p.own && <button class={`fact press${open2 === 'why' ? ' on' : ''}`} aria-expanded={open2 === 'why'} onClick={() => toggle('why')}>
             <b class="num">{p.worth}<small>/10</small></b><span class="muted small">Why? {open2 === 'why' ? <Icon.up /> : <Icon.down />}</span>
-          </button>
-          <div class="fact"><b class="num">{p.price ? <>{short(trip, p.price)}<small> pp</small></> : 'Free'}</b><span class="muted small">{p.price ? `${home(trip, group)} for ${trip.people.length}` : 'for everyone'}</span></div>
+          </button>}
+          {!p.own && <div class="fact"><b class="num">{p.price ? <>{short(trip, p.price)}<small> pp</small></> : 'Free'}</b><span class="muted small">{p.price ? `${home(trip, group)} for ${trip.people.length}` : 'for everyone'}</span></div>}
           <button class={`fact press${open2 === 'travel' ? ' on' : ''}`} aria-expanded={open2 === 'travel'} disabled={!f} onClick={() => toggle('travel')}>
             {f && M ? <><b class="num"><M />{f.real ? '' : '≈'}{f.minutes} min</b><span class="muted small">from here {open2 === 'travel' ? <Icon.up /> : <Icon.down />}</span></>
               : <><b class="num">–</b><span class="muted small">{loc.busy || !loc.error ? 'Finding you…' : 'Location off'}</span></>}

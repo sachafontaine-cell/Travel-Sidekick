@@ -86,6 +86,8 @@ export interface Place {
   scoring?: boolean
   /** Where the location comes from: Google Maps or OpenStreetMap (checked), or Gemini's guess (unset). */
   loc?: { src: 'google' | 'osm' | 'none'; exact?: boolean; address?: string; at: number }
+  /** Written in by hand: your own plan (no score, no Gemini). The note is in desc. */
+  own?: true
   /** Suggested by a refresh after the trip settings changed; shows "New" until its card is opened. */
   fresh?: true
   /** The English Wikipedia article for this place, if Gemini knows one (checked before use). */

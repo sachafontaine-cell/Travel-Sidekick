@@ -25,6 +25,8 @@ export interface Settings {
   keyShared?: boolean
   kayak?: string
   energy?: { date: string; level: Energy }
+  /** The trip last open on this phone: the app reopens on it. */
+  lastTrip?: string
 }
 export const settings = createStore<Settings>({}, 'settings')
 

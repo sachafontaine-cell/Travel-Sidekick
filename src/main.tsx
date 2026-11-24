@@ -27,6 +27,12 @@ for (const t of Object.values(trips.get())) {
   if (t.built && t.listFor == null) save('trip', [{ ...t, listFor: listKey(t) }])
 }
 if (DEMO && !location.hash.replace(/^#\/?/, '')) go(tripPath('demo-paris'), true)
+// Opening the app (no screen asked for): back to the trip you were last in. Trips is one tap away.
+const last = settings.get().lastTrip
+if (!DEMO && !location.hash.replace(/^#\/?/, '') && last && trips.get()[last]?.built) go(tripPath(last), true)
+// Remember the trip you're in.
+const remember = () => { const r = route.get(); if (r.name !== 'trips' && trips.get()[r.trip] && settings.get().lastTrip !== r.trip) settings.set({ ...settings.get(), lastTrip: r.trip }) }
+remember(); route.subscribe(remember)
 
 // The family link (…/?k=KEY&api=SCRIPT_URL) is read once, kept on this phone, then hidden.
 const q = new URLSearchParams(location.search)

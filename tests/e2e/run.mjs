@@ -435,6 +435,10 @@ await test('new trip: setup, key, build the list (streamed), confirm must-sees, 
   expect(reviewed.find((x) => x.name === 'Sainte-Chapelle')?.fresh && reviewed.find((x) => x.name === 'Bouillon Chartier').status === 'out', 'added the missing one, skipped the poor fit')
   expect(p.errors.filter((e) => !/Failed to load resource/.test(e)).length === 0, 'no errors: ' + p.errors.join(' | '))
   await p.screenshot({ path: `${SHOTS}/new-trip-plan.png` })
+  // Reopening the app goes straight back into this trip; Trips is one tap away.
+  await p.goto(BASE)
+  await p.waitForFunction(() => location.hash.includes('/today'))
+  expect((await p.evaluate(() => location.hash)).includes('/today'), 'reopens on the last trip')
   await p.context().close()
 })
 

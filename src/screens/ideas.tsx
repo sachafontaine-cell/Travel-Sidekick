@@ -1,6 +1,6 @@
 // Ideas: everything worth doing on this trip, to choose from. One job: decide what you want.
-// Search, one row of type chips, the list (or the same places on a map). Check = want it;
-// "Plan my days" fits what you want into the Days tab.
+// Search, Filters (the same as the map's), the list (or the same places on a map). Check = want it;
+// "Fit them in" puts what you want on the days.
 import { useEffect, useState } from 'preact/hooks'
 import { createStore } from '../lib/store'
 import { Icon, Spinner } from '../ui'
@@ -19,23 +19,12 @@ import { short } from '../lib/money'
 import { km, legText } from '../lib/geo'
 import { groupOf, type Group } from '../lib/groups'
 import { GROUP_COLOR, GROUP_LIST } from '../lib/groupStyle'
-import { filters, type Filters } from './sheets'
+import { applyFilter, DEFAULT_FILTER, FilterPanel, ideaFilter, isCustom } from './filterpanel'
 import { TripBar } from './tripbar'
 import type { Place, Trip } from '../lib/model'
 
 /** Which chip is on (all, must-sees, or one type) and the search text. Kept while the app is open. */
-const view = createStore<{ chip: Group | 'all' | 'must' | 'done'; q: string }>({ chip: 'all', q: '' })
-
-/** Best first: must-sees, then by score; done ones last. Other sorts from Sort & filter. */
-function sortList(list: Place[], f: Filters, trip: Trip): Place[] {
-  const base = trip.base ?? trip.dest
-  const s = [...list]
-  if (f.sort === 'value') s.sort((a, b) => b.value - a.value)
-  else if (f.sort === 'price') s.sort((a, b) => a.price - b.price)
-  else if (f.sort === 'distance') s.sort((a, b) => km(base, a) - km(base, b))
-  else s.sort((a, b) => Number(!!a.done) - Number(!!b.done) || Number(b.must) - Number(a.must) || b.worth - a.worth)
-  return s.filter((p) => (!f.hideTraps || p.badge !== 'trap') && (!f.under || p.price <= f.under) && (!f.kids || p.sub.kid >= 7) && (!f.near || km(base, p) < 1.5))
-}
+const view = createStore<{ q: string }>({ q: '' })
 
 const words = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
@@ -65,34 +54,23 @@ function MapLazy({ trip }: { trip: Trip }) {
 }
 
 function List({ trip }: { trip: Trip }) {
-  const f = filters.use()
+  const f = ideaFilter.use()
   const v = view.use()
-  here.use()
+  here.use(); unfitIds.use()
   // Times on each row are from where you are now.
   useEffect(() => { void locate() }, [])
   const [showOut, setShowOut] = useState(false)
+  const [panel, setPanel] = useState(false)
   const all = tripPlaces(trip.id).filter((p) => !(p.booked && p.kind === 'other'))
-  // Hide food (Sort & filter): out of the list, the counts and the chips, until you show it again.
-  const live = all.filter((p) => p.status !== 'out' && !(f.hideFood && groupOf(p) === 'food'))
   const q = words(v.q.trim())
-  const match = (p: Place) => (!q || words(p.name).includes(q)) && (v.chip === 'all' ? true : v.chip === 'done' ? !!p.done : v.chip === 'must' ? p.must : groupOf(p) === v.chip)
-  const list = sortList(live.filter(match), f, trip)
-  const out = sortList(all.filter((p) => p.status === 'out' && match(p) && !(f.hideFood && groupOf(p) === 'food')), { ...f, hideTraps: false }, trip)
-  const custom = f.sort !== 'mine' || f.hideTraps === false || !!f.under || f.kids || f.near || !!f.hideFood
-  // A hidden type can't stay the chosen chip.
-  useEffect(() => { if (f.hideFood && v.chip === 'food') view.set({ ...v, chip: 'all' }) }, [f.hideFood])
-  const wanted = live.filter((p) => p.status === 'picked').length
+  const match = (p: Place) => !q || words(p.name).includes(q)
+  const list = applyFilter(all, f, trip).filter(match)
+  const out = all.filter((p) => p.status === 'out' && match(p))
+  const custom = isCustom(f)
+  const wanted = all.filter((p) => p.status === 'picked').length
   const toDecide = queueFor(trip, settings.get().me).length
   const cap = capacity(trip, all)
-  const count = (g: Group) => live.filter((p) => groupOf(p) === g).length
-  const doneN = live.filter((p) => p.done).length
-  const chips: [Group | 'all' | 'must' | 'done', string, string?][] = [
-    ['all', `All ${live.length}`],
-    ...(doneN ? [['done', `✓ Done ${doneN}`] as [Group | 'all' | 'must' | 'done', string]] : []),
-    ...(live.some((p) => p.must) ? [['must', `★ Must-sees`] as [Group | 'all' | 'must', string]] : []),
-    ...GROUP_LIST.filter(([g]) => count(g) > 0).map(([g, name, c]) => [g, `${name} ${count(g)}`, c] as [Group, string, string]),
-  ]
-  const chip = (c: Group | 'all' | 'must' | 'done') => view.set({ ...v, chip: v.chip === c && c !== 'all' ? 'all' : c })
+  const pend = pendingFor(trip)
 
   return (
     <>
@@ -101,12 +79,13 @@ function List({ trip }: { trip: Trip }) {
         <span class="search"><Icon.search /><input type="search" placeholder="Search your ideas" aria-label="Search your ideas" value={v.q} onInput={(e) => view.set({ ...v, q: (e.target as HTMLInputElement).value })} /></span>
         <button class="pill press" onClick={() => open({ kind: 'sheet', name: 'discover', arg: v.q.trim() || undefined })}><Icon.plus />Find more</button>
       </div>
-      <div class="strip chipstrip" role="group" aria-label="Show">
-        {chips.map(([c, label, color]) => <button class={`pill press${v.chip === c ? ' on' : ''}`} aria-pressed={v.chip === c} onClick={() => chip(c)}>{color && <span class="dot" style={{ background: color }} />}{label}</button>)}
-        {f.hideFood && <button class="pill press hiddenchip" onClick={() => filters.set({ ...f, hideFood: false })}>Food hidden · show</button>}
-      </div>
+      {panel ? <FilterPanel trip={trip} all={all} shown={list.length} sort done={{ label: 'Show {n}', onClick: () => setPanel(false) }} /> : (
+        <button class="banner press" aria-label="Filters" onClick={() => setPanel(true)}>
+          <Icon.filter /><span class="grow small"><b>{list.length} shown</b>{custom ? ' · filtered' : ''}</span><span class="strong small">Filters</span><Icon.down />
+        </button>
+      )}
 
-      {toDecide > 0 && !q && (
+      {toDecide > 0 && !q && !panel && (
         <button class="decide-cta press" onClick={() => open({ kind: 'sheet', name: 'decide' })}>
           <span class="grow stack" style={{ gap: '2px', textAlign: 'left' }}><b>Help me choose</b><span class="muted small">{toDecide} to look at, one at a time</span></span>
           <Icon.chev />
@@ -114,21 +93,25 @@ function List({ trip }: { trip: Trip }) {
       )}
 
       <div class="listhead">
-        <span class="grow stack" style={{ gap: '1px' }}><b>{wanted} wanted</b><span class={`small ${cap.left < -60 ? 'warn-text' : 'muted'}`}>{capacityText(cap)}</span></span>
-        <button class={`iconbtn ring press${custom ? ' on' : ''}`} aria-label="Sort & filter" onClick={() => open({ kind: 'sheet', name: 'filter' })}><Icon.filter /></button>
+        <span class="grow stack" style={{ gap: '1px' }}>
+          <b>{wanted} wanted</b>
+          <span class={`small ${cap.left < -60 ? 'warn-text' : 'muted'}`}>{capacityText(cap)}</span>
+          {/* Wanted but not on a day yet: one quiet line (Days says it too), not a floating bar. */}
+          {pend && pend.add.length > 0 && <span class="small">{pend.add.length} not on a day yet · <button class="link small press" onClick={() => fitWanted(trip)}>Fit them in</button></span>}
+        </span>
         <button class="iconbtn ring press" aria-label="New activity" onClick={() => open({ kind: 'sheet', name: 'add', arg: trip.id })}><Icon.plus /></button>
       </div>
       {list.length > 0 ? <div class="list">{list.map((p) => <Row trip={trip} p={p} />)}</div> : (
         <div class="empty">
-          <p>{q ? `Nothing called "${v.q.trim()}" yet.` : 'Nothing here yet.'}</p>
-          <button class="btn btn-primary press" onClick={() => open({ kind: 'sheet', name: 'discover', arg: v.q.trim() || undefined })}><Icon.search />{q ? `Search Google for "${v.q.trim()}"` : 'Find more'}</button>
+          <p>{q ? `Nothing called "${v.q.trim()}" yet.` : custom ? 'Nothing matches the filters.' : 'Nothing here yet.'}</p>
+          {custom && !q ? <button class="btn btn-secondary press" onClick={() => ideaFilter.set({ ...DEFAULT_FILTER, sort: f.sort })}>Reset filters</button>
+            : <button class="btn btn-primary press" onClick={() => open({ kind: 'sheet', name: 'discover', arg: v.q.trim() || undefined })}><Icon.search />{q ? `Search Google for "${v.q.trim()}"` : 'Find more'}</button>}
         </div>
       )}
 
       {out.length > 0 && <button class="fold press" aria-expanded={showOut} onClick={() => setShowOut(!showOut)}>Skipped ({out.length}){showOut ? <Icon.up /> : <Icon.down />}</button>}
       {showOut && <div class="list">{out.map((p) => <Row trip={trip} p={p} />)}</div>}
       <button class="link press" style={{ alignSelf: 'center' }} onClick={() => open({ kind: 'sheet', name: 'review' })}>Anything missing? Check my list</button>
-      <PlanBar trip={trip} />
     </>
   )
 }
@@ -169,23 +152,6 @@ export function pendingFor(trip: Trip) {
   const unfit = unfitIds.get()
   const fresh = add.filter((p) => !unfit.includes(p.id))
   return { add: fresh, remove, stuck: add.filter((p) => unfit.includes(p.id)), started: now.day >= 1 }
-}
-
-/** Sticky at the bottom whenever what you want and the days disagree. */
-function PlanBar({ trip }: { trip: Trip }) {
-  unfitIds.use()
-  const pend = pendingFor(trip)
-  if (!pend) return null
-  if (!pend.add.length && !pend.remove.length) {
-    return pend.stuck.length ? <p class="muted small tcenter">{pend.stuck.length} wanted {pend.stuck.length === 1 ? "doesn't" : "don't"} fit the days: {pend.stuck.map((p) => p.name).join(', ')}.</p> : null
-  }
-  const what = [pend.add.length && `${pend.add.length} to add`, pend.remove.length && `${pend.remove.length} to remove`].filter(Boolean).join(' · ')
-  return (
-    <div class="planbar">
-      <button class="btn btn-primary grow press" onClick={() => fitWanted(trip)}><Icon.plan />Plan my days</button>
-      <span class="small">{what}{pend.started ? ' · from tomorrow' : ''}</span>
-    </div>
-  )
 }
 
 /** The checkbox: checked = want it. ↺ on a skipped place brings it back. Swipe ← skips, → wants. */

@@ -116,23 +116,21 @@ await test('sample trip: the Card is a dialog; X and a tap outside close it; the
   await p.context().close()
 })
 
-await test('sample trip: Ideas: type chips and search narrow the list; swipe skips (with Undo)', async () => {
+await test('sample trip: Ideas: filters (like the map) and search narrow the list; swipe skips (with Undo)', async () => {
   const p = await page()
   await p.goto(BASE + '?demo#/t/demo-paris/ideas')
   const names = () => p.locator('.prow .name').allInnerTexts()
   const all = (await names()).length
-  await p.getByRole('button', { name: /^Museums/ }).click()
-  const museums = await names()
-  expect(museums.length > 0 && museums.length < all && museums.includes("Musée d'Orsay"), `the Museums chip shows museums (${museums})`)
-  await p.getByRole('button', { name: /^All \d+$/ }).click()
-  // Hide food: gone from the list and the chips, one tap to show it again.
-  await p.getByRole('button', { name: 'Sort & filter' }).click()
-  await p.getByRole('button', { name: 'Hide food' }).click()
-  await p.keyboard.press('Escape')
+  // Filters, the same as the map's: here, food off and must-sees only.
+  await p.getByRole('button', { name: 'Filters' }).click()
+  await p.getByRole('button', { name: /^Food \d/ }).click()
+  await p.getByRole('button', { name: /^Show \d+$/ }).click()
   expect(!(await names()).some((n) => /Lunch|Dinner|Fallafel|Berthillon/.test(n)), 'no food in the list')
-  expect(await p.getByRole('button', { name: /^Food \d/ }).count() === 0, 'no Food chip')
-  await p.getByRole('button', { name: 'Food hidden · show' }).click()
-  expect((await names()).some((n) => /Lunch/.test(n)), 'food is back')
+  expect((await names()).length < all, 'fewer shown')
+  await p.getByRole('button', { name: 'Filters' }).click()
+  await p.getByRole('button', { name: 'Reset' }).click()
+  await p.getByRole('button', { name: /^Show \d+$/ }).click()
+  expect((await names()).length === all, 'Reset shows everything')
   await p.getByLabel('Search your ideas').fill('eiffel')
   expect((await names()).join() === 'Eiffel Tower', 'search finds it')
   await p.getByLabel('Search your ideas').fill('turtle')
@@ -156,14 +154,14 @@ await test('sample trip: Ideas: type chips and search narrow the list; swipe ski
   await p.context().close()
 })
 
-await test('sample trip: checklist + Plan my days; Card Want it · Maybe · Skip; Add to this day', async () => {
+await test('sample trip: checklist + Fit them in; Card Want it · Maybe · Skip; Add to this day', async () => {
   const p = await page()
   await p.goto(BASE + '?demo#/t/demo-paris/ideas')
   const box = p.locator('.prow [role=checkbox][aria-checked=false]').first()
   const name = await box.getAttribute('aria-label')
   await box.click()
   expect(await p.getByRole('checkbox', { name, exact: true }).getAttribute('aria-checked') === 'true', 'the box is checked')
-  await p.getByRole('button', { name: 'Plan my days' }).click()
+  await p.getByRole('button', { name: 'Fit them in' }).click()
   await p.getByText(/^Days planned/).waitFor()
   const row = p.locator('.prow', { has: p.getByRole('checkbox', { name, exact: true }) })
   expect(/Day \d|No room/.test(await row.innerText()), 'the checked place got a day (or says there is no room)')

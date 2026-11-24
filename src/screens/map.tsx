@@ -4,13 +4,12 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { Icon, Seg } from '../ui'
+import { Icon } from '../ui'
 import { places, tripPlaces } from '../lib/data'
 import { open } from '../lib/nav'
-import { createStore } from '../lib/store'
+import { applyFilter, FilterPanel, ideaFilter, isCustom } from './filterpanel'
 import { groupOf, type Group } from '../lib/groups'
-import { GROUP_COLOR, GROUP_LIST } from '../lib/groupStyle'
-import { tripDays } from '../lib/planner'
+import { GROUP_COLOR } from '../lib/groupStyle'
 import { price } from '../lib/money'
 import { legText } from '../lib/geo'
 import { travelFrom } from '../lib/routes'
@@ -19,19 +18,8 @@ import type { Place, Trip } from '../lib/model'
 
 const COLOR = GROUP_COLOR
 
-interface MapFilters { which: 'all' | 'picked' | 'maybe'; off: Group[]; day: number | 'any' | 'none'; must: boolean; free: boolean; kids: boolean }
-const DEFAULT: MapFilters = { which: 'all', off: [], day: 'any', must: false, free: false, kids: false }
-const mapFilters = createStore<MapFilters>(DEFAULT, 'mapfilters')
 /** Filters come first the first time the map is opened; after that, straight to the map. */
 let filtered = false
-
-function visible(all: Place[], f: MapFilters): Place[] {
-  return all.filter((p) => p.status !== 'out' && !p.scoring && !(p.booked && p.kind === 'other')
-    && (f.which === 'all' || p.status === f.which)
-    && !f.off.includes(groupOf(p))
-    && (f.day === 'any' || (f.day === 'none' ? p.day == null : p.day === f.day))
-    && (!f.must || p.must) && (!f.free || p.price === 0) && (!f.kids || p.sub.kid >= 7))
-}
 
 const pinIcon = (p: Place, selected: boolean) => L.divIcon({
   className: '',
@@ -41,16 +29,15 @@ const pinIcon = (p: Place, selected: boolean) => L.divIcon({
 
 export function MapView({ trip }: { trip: Trip }) {
   const ps = places.use()
-  const f = mapFilters.use()
+  const f = ideaFilter.use()
   const loc = here.use()
   const all = useMemo(() => tripPlaces(trip.id), [ps, trip.id])
-  const shown = useMemo(() => visible(all, f), [all, f])
+  const shown = useMemo(() => applyFilter(all, f, trip), [all, f])
   const [panel, setPanel] = useState(!filtered)
   const [sel, setSel] = useState<string | null>(null)
   const box = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const layer = useRef<L.LayerGroup | null>(null)
-  const set = (patch: Partial<MapFilters>) => mapFilters.set({ ...f, ...patch })
   useEffect(() => { void locate() }, [])
 
   // The map itself, once.
@@ -90,38 +77,14 @@ export function MapView({ trip }: { trip: Trip }) {
   // Fit the pins when the map opens and whenever "Show on map" is tapped.
   useEffect(() => { if (!panel) { filtered = true; requestAnimationFrame(() => requestAnimationFrame(() => { map.current?.invalidateSize(); fit() })) } }, [panel])
 
-  const days = tripDays(trip)
-  const counts = Object.fromEntries(GROUP_LIST.map(([g]) => [g, all.filter((p) => p.status !== 'out' && groupOf(p) === g).length]))
   const p = sel ? places.get()[sel] : undefined
   const t = p && loc.pt ? travelFrom(trip, p, loc.pt) : null
-  const custom = JSON.stringify(f) !== JSON.stringify(DEFAULT)
+  const custom = isCustom(f)
 
   return (
     <>
       {panel ? (
-        <div class="card card-pad stack mapfilters">
-          <Seg label="Show" options={[['all', 'All'], ['picked', 'Checked'], ['maybe', 'Not checked']]} value={f.which} onChange={(v) => set({ which: v })} />
-          <div class="chips">
-            {GROUP_LIST.filter(([g]) => counts[g] > 0).map(([g, name, c]) => {
-              const on = !f.off.includes(g)
-              return <button class={`pill press${on ? ' on' : ''}`} aria-pressed={on} onClick={() => set({ off: on ? [...f.off, g] : f.off.filter((x) => x !== g) })}><span class="dot" style={{ background: c }} />{name} {counts[g]}</button>
-            })}
-          </div>
-          <div class="strip">
-            {(['any', 'none', ...Array.from({ length: days }, (_, i) => i + 1)] as MapFilters['day'][]).map((d) => (
-              <button class={`pill press${f.day === d ? ' on' : ''}`} aria-pressed={f.day === d} onClick={() => set({ day: d })}>{d === 'any' ? 'Any day' : d === 'none' ? 'No day yet' : `Day ${d}`}</button>
-            ))}
-          </div>
-          <div class="chips">
-            <button class={`pill press${f.must ? ' on' : ''}`} aria-pressed={f.must} onClick={() => set({ must: !f.must })}>★ Must-sees</button>
-            <button class={`pill press${f.free ? ' on' : ''}`} aria-pressed={f.free} onClick={() => set({ free: !f.free })}>Free</button>
-            <button class={`pill press${f.kids ? ' on' : ''}`} aria-pressed={f.kids} onClick={() => set({ kids: !f.kids })}>Kid-friendly</button>
-          </div>
-          <div class="row">
-            {custom && <button class="btn btn-quiet press" onClick={() => mapFilters.set(DEFAULT)}>Reset</button>}
-            <button class="btn btn-primary grow press" onClick={() => setPanel(false)}>Show {shown.length} on the map</button>
-          </div>
-        </div>
+        <FilterPanel trip={trip} all={all} shown={shown.length} done={{ label: 'Show {n} on the map', onClick: () => setPanel(false) }} />
       ) : (
         <button class="banner press" onClick={() => setPanel(true)}>
           <Icon.filter /><span class="grow small"><b>{shown.length} places</b>{custom ? ' · filtered' : ''}</span><span class="strong small">Filters</span><Icon.down />

@@ -2,7 +2,7 @@
 // matters right now. Before the trip it's the "before you go" list.
 import { useState } from 'preact/hooks'
 import { Icon } from '../ui'
-import { nowIn, places, plansFor, save, settings, tripPlaces, trips } from '../lib/data'
+import { nowIn, places, plansFor, save, save as save_, settings, tripPlaces, trips } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
 import { addNow, setDay, setDone } from '../lib/actions'
 import { mustInfo, countdown } from '../lib/musts'
@@ -88,8 +88,6 @@ export function Now({ trip }: { trip: Trip }) {
   const plan = plansFor(trip)[now.day - 1]
   if (!plan) return null
   const slots = plan.slots
-  // "Done?" is for things you choose to do, plus booked must-sees (they count). Flights just happen.
-  const asked = slots.filter((x) => x.place && (!x.place.booked || x.place.must) && x.end <= now.min && !x.place.done && x.place.status !== 'out')
   const next = slots.find((x) => x.end > now.min)
   const energy: Energy = s.energy?.date === now.date ? s.energy.level : 'ok'
   const gap = gapNow(trip, plan, now.min)
@@ -100,14 +98,6 @@ export function Now({ trip }: { trip: Trip }) {
 
   return (
     <>
-      {asked.slice(-1).map((x) => (
-        <div class="banner">
-          <span class="grow"><b>{x.place!.name}</b>: done?</span>
-          <button class="btn btn-primary btn-sm press" onClick={() => setDone(x.id, true)}>Yes</button>
-          <button class="btn btn-quiet btn-sm press" onClick={() => setDay(x.id, null)}>Not yet</button>
-        </div>
-      ))}
-
       {next && (
         <div class="card hero nowcard">
           <button class="stack press" style={{ gap: '4px', textAlign: 'left' }} onClick={() => next.place && open({ kind: 'card', place: next.id })}>
@@ -144,5 +134,45 @@ export function Now({ trip }: { trip: Trip }) {
         </div>
       )}
     </>
+  )
+}
+
+/**
+ * "Did you do these?": every stop that's behind you (earlier days, and today's that have ended)
+ * and isn't marked done yet. All ticked to start; Save marks them done, and unticked ones go back
+ * to Ideas. Done places are never suggested again and count for must-sees.
+ */
+export function DidYouDo({ trip }: { trip: Trip }) {
+  const ps = places.use()
+  const now = nowIn(trip)
+  const plans = plansFor(trip)
+  const past = plans.filter((pl) => pl.day <= now.day).flatMap((pl) => pl.slots.filter((x) => x.place && (pl.day < now.day || x.end <= now.min)).map((x) => ({ p: ps[x.id], day: pl.day })))
+    // Flights and other bookings that aren't activities just happen: nothing to ask.
+    .filter(({ p }) => p && !p.done && p.status !== 'out' && !(p.booked && p.kind === 'other'))
+  const [off, setOff] = useState<string[]>([])
+  if (!past.length) return null
+  const save = () => {
+    const changed = past.map(({ p }) => (off.includes(p.id) ? { ...p, day: null, dayRank: undefined, fixed: p.booked ? p.fixed : null } : { ...p, done: true }))
+    const n = past.length - off.length
+    save_('place', changed, `${n} marked done${off.length ? ` · ${off.length} back in Ideas` : ''}`)
+    setOff([])
+  }
+  return (
+    <div class="card card-pad stack didyou">
+      <div class="between"><b>Did you do these?</b><span class="muted small">Untick what you missed</span></div>
+      <div class="list">
+        {past.map(({ p, day }) => {
+          const on = !off.includes(p.id)
+          return (
+            <button class="check press" role="checkbox" aria-checked={on} aria-label={p.name} onClick={() => setOff(on ? [...off, p.id] : off.filter((x) => x !== p.id))}>
+              <span class={`tick${on ? ' on' : ''}`} style={{ width: '32px', height: '32px' }}><span>{on ? <Icon.check /> : null}</span></span>
+              <span class="grow" style={{ textAlign: 'left' }}>{p.name}</span>
+              <span class="muted small">{day === now.day ? 'Today' : `Day ${day}`}</span>
+            </button>
+          )
+        })}
+      </div>
+      <button class="btn btn-primary press" onClick={save}>Save</button>
+    </div>
   )
 }

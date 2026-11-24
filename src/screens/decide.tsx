@@ -107,7 +107,10 @@ export function Decide({ trip }: { trip: Trip }) {
             <button class="btn btn-quiet press" onClick={() => pick('maybe')}>Maybe</button>
             <button class="btn btn-primary press" onClick={() => pick('picked')}><Icon.check />Want</button>
           </div>
-          {hist.length > 0 && <button class="link small press" onClick={undo}>Undo</button>}
+          <div class="row" style={{ gap: '18px' }}>
+            {hist.length > 0 && <button class="link small press" onClick={undo}>Undo</button>}
+            <button class="link small press" onClick={() => { setHist([...hist, p]); save('place', [{ ...p, done: true }]); setI(i + 1) }}>Already done</button>
+          </div>
         </div>
       </div>
     </Dialog>

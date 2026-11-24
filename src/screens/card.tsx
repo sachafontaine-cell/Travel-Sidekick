@@ -184,7 +184,7 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
         <div class="row">
           <button class={`btn ${day || p.status !== 'picked' ? 'btn-secondary' : 'btn-primary'} grow press`} onClick={() => open({ kind: 'sheet', name: 'day', arg: p.id })}>{day ? `Day ${day}` : 'Add to a day'} <Icon.down /></button>
           {day != null && (slot || p.fixed != null) && <Clock24 label={`Start time of ${p.name}`} value={p.fixed ?? slot!.start} custom={p.fixed != null} onChange={(v) => setTime(trip, p.id, v)} />}
-          {day != null && <button class={`btn btn-sm press donebtn${p.done ? ' on' : ''}`} aria-pressed={!!p.done} onClick={() => setDone(p.id, !p.done)}><Icon.check />Done</button>}
+          {<button class={`btn btn-sm press donebtn${p.done ? ' on' : ''}`} aria-pressed={!!p.done} onClick={() => setDone(p.id, !p.done)}><Icon.check />Done</button>}
         </div>
       )}
       {p.status !== 'out' && day != null && p.fixed != null && (

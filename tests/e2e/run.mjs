@@ -46,9 +46,18 @@ await test('sample trip: Days opens on today: Now card with next up, leave-by, f
   expect(t.includes('Lunch · Le Fumoir'), 'next up is lunch')
   expect(/Leave by \d/.test(t), 'leave-by shown')
   expect(t.includes('Free time?') && t.includes('Tuileries Garden'), 'free time suggests the Tuileries')
-  expect(t.includes('Louvre (highlights tour): done?'), 'asks if the Louvre is done')
-  await p.getByRole('button', { name: 'Yes' }).click()
-  await p.getByText(/5 of 9 done/).waitFor()
+  // Did you do these? Everything behind you that isn't marked done; untick what you missed.
+  const did = p.locator('.didyou')
+  await did.getByRole('checkbox', { name: 'Louvre (highlights tour)' }).waitFor()
+  await did.getByRole('checkbox', { name: 'Sainte-Chapelle' }).count()
+  const missed = (await did.getByRole('checkbox').allInnerTexts()).length
+  expect(missed > 0, 'asks about what is behind us')
+  await did.getByRole('checkbox', { name: 'Louvre (highlights tour)' }).click()
+  await did.getByRole('button', { name: 'Save' }).click()
+  await p.getByText(/marked done · 1 back in Ideas/).waitFor()
+  expect(await p.locator('.didyou').count() === 0, 'nothing left to ask')
+  const after = await storedPlaces(p)
+  expect(after.find((x) => x.name.startsWith('Louvre')).day == null && !after.find((x) => x.name.startsWith('Louvre')).done, 'the missed one went back to Ideas')
   // Every trip screen has a way back to all trips, and to ⚙.
   await p.getByRole('button', { name: 'This app: key, family link, alerts' }).click()
   await p.getByRole('dialog', { name: 'This app' }).waitFor()

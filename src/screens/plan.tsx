@@ -13,7 +13,7 @@ import { legTextOf } from '../lib/geo'
 import { realLegs } from '../lib/legs'
 import { fitWanted, pendingFor, unfitIds } from './ideas'
 import { TripBar } from './tripbar'
-import { BeforeTrip, Now, Weather } from './today'
+import { BeforeTrip, DidYouDo, Now, Weather } from './today'
 import type { Trip } from '../lib/model'
 
 export function Plan({ trip, day }: { trip: Trip; day: number }) {
@@ -32,6 +32,7 @@ export function Plan({ trip, day }: { trip: Trip; day: number }) {
       {now.day < 1 && <BeforeTrip trip={trip} />}
       {now.day > n && <p class="muted">Trip over. Welcome home!</p>}
       <DateStrip trip={trip} sel={sel} />
+      <DidYouDo trip={trip} />
       <Alert trip={trip} />
       {sel === now.day && <Now trip={trip} />}
       <Day trip={trip} day={sel} />

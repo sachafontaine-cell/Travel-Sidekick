@@ -280,6 +280,11 @@ await test('sample trip: Day view drag moves downtime; Back closes overlays firs
   await p.goBack()
   await p.getByRole('dialog').waitFor({ state: 'detached' })
   expect(p.url().includes('plan/4'), 'still on Day 4 after Back')
+  // Crossing it off: a check on the row, the count for the day, and a line through the name.
+  await p.getByRole('checkbox', { name: /^Done: Jardin/ }).click()
+  await p.getByText(/✓ Jardin d'Acclimatation · 1 of \d done/).waitFor()
+  expect(await p.getByRole('checkbox', { name: /^Done: Jardin/ }).getAttribute('aria-checked') === 'true', 'crossed off')
+  await p.getByText(/1 of \d done · walk/).waitFor()
   await p.context().close()
 })
 
@@ -327,6 +332,7 @@ const PLACES = [
 const passes = []
 async function fakeServices(p) {
   // Real places nearby (OpenStreetMap): one Gemini didn't name on its own.
+  await p.route('https://nominatim.openstreetmap.org/**', (r) => r.fulfill({ json: [] }))
   await p.route('https://overpass-api.de/**', (r) => r.fulfill({ json: { elements: [{ lat: 48.8440, lon: 2.3596, tags: { tourism: 'zoo', name: 'Jardin des Plantes', wikidata: 'Q1' } }, { lat: 48.8584, lon: 2.2945, tags: { tourism: 'attraction', name: 'Eiffel Tower', wikidata: 'Q243' } }] } }))
   await p.route('https://geocoding-api.open-meteo.com/**', (r) => r.fulfill({ json: { results: [{ name: 'Paris', latitude: 48.8566, longitude: 2.3522, timezone: 'Europe/Paris', country_code: 'FR', country: 'France', admin1: 'Île-de-France' }] } }))
   await p.route('https://api.open-meteo.com/**', (r) => r.fulfill({ json: { hourly: { time: ['2026-06-12T10:00'], temperature_2m: [70], precipitation_probability: [10] } } }))

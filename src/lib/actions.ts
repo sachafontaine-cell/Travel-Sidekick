@@ -36,9 +36,16 @@ export function setMust(id: string, must: boolean) {
   put({ ...p, must, status: must && p.status === 'out' ? 'picked' : p.status }, must ? `${p.name} is a must-see` : `${p.name} is no longer a must-see`)
 }
 
+/** Crossing it off: done, with how the day is going ("3 of 5 done today"). */
 export function setDone(id: string, done: boolean) {
   const p = one(id)
-  if (p) put({ ...p, done }, done ? `${p.name} done` : undefined)
+  if (!p) return
+  if (!done) return put({ ...p, done }, `${p.name}: not done`)
+  if (typeof navigator !== 'undefined') navigator.vibrate?.([12, 40, 18])
+  const day = p.day != null ? dayPlaces(tripPlaces(p.trip), p.day).filter((x) => !(x.booked && x.kind === 'other')) : []
+  const doneN = day.filter((x) => x.done || x.id === p.id).length
+  const label = !day.length ? `✓ ${p.name} crossed off` : doneN === day.length ? `🎉 All ${day.length} done for the day!` : `✓ ${p.name} · ${doneN} of ${day.length} done`
+  put({ ...p, done }, label)
 }
 
 export function setMinutes(id: string, minutes: number) {

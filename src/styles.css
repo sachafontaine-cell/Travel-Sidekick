@@ -382,3 +382,13 @@ button.fact:disabled { opacity: 1; }
 .energy.mini { display: inline-flex; gap: 4px; }
 .energy.mini button { width: 36px; height: 36px; border-radius: 18px; font-size: 18px; background: var(--tile); border: 1px solid transparent; }
 .energy.mini button.on { border-color: var(--primary); background: var(--surface); }
+
+/* Crossing things off: a round check that pops, and a line through the name */
+.cross { width: 40px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: -6px; }
+.cross.none { width: 34px; }
+.cross > span { width: 26px; height: 26px; border-radius: 13px; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; transition: background 160ms ease-out, border-color 160ms ease-out; }
+.cross svg { width: 16px; height: 16px; stroke-width: 3; }
+.cross.on > span { background: var(--success); border-color: var(--success); color: var(--success-bg); animation: pop 260ms cubic-bezier(.2, 1.6, .4, 1); }
+.slot.done .name { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--muted); }
+@keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .cross.on > span { animation: none; } }

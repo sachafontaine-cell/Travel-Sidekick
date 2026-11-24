@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'preact/hooks'
 import { Icon } from '../ui'
 import { days, nowIn, places, plansFor, tripPlaces, trips } from '../lib/data'
 import { go, open, tripPath } from '../lib/nav'
-import { moveInDay, setDay } from '../lib/actions'
+import { moveInDay, setDay, setDone } from '../lib/actions'
 import { startDrag, swipeable } from '../lib/gestures'
 import { countdown, mustInfo } from '../lib/musts'
 import { dateOf, dayPlaces, tripDays, type Slot } from '../lib/planner'
@@ -86,6 +86,9 @@ function Alert({ trip }: { trip: Trip }) {
 }
 
 
+/** "3 of 5 done · " once something's crossed off. */
+const doneText = (slots: Slot[]) => { const ps = slots.filter((s) => s.place && !(s.place.booked && s.place.kind === 'other')); const d = ps.filter((s) => s.place!.done).length; return d ? `${d} of ${ps.length} done · ` : '' }
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 // ---- One day
@@ -109,7 +112,7 @@ function Day({ trip, day }: { trip: Trip; day: number }) {
   }
   return (
     <>
-      <div class="between"><span class="h3">{WEEKDAY_LONG[weekday(date)]} {Number(date.slice(8))} {MONTHS[Number(date.slice(5, 7)) - 1]}</span><span class="stack" style={{ gap: '1px', alignItems: 'flex-end' }}><Weather trip={trip} date={date} /><span class="muted small">Day {day} · walking {plan.walkMi} of {plan.limitMi} mi</span></span></div>
+      <div class="between"><span class="h3">{WEEKDAY_LONG[weekday(date)]} {Number(date.slice(8))} {MONTHS[Number(date.slice(5, 7)) - 1]}</span><span class="stack" style={{ gap: '1px', alignItems: 'flex-end' }}><Weather trip={trip} date={date} /><span class="muted small" style={{ whiteSpace: 'nowrap' }}>{doneText(slots)}walk {plan.walkMi}/{plan.limitMi} mi</span></span></div>
       {near && <div class="bar" aria-hidden="true"><span style={{ width: `${Math.min(100, (plan.walkMi / plan.limitMi) * 100)}%`, background: plan.over ? 'var(--danger)' : undefined }} /></div>}
       {plan.issues.length > 0 && day >= fixFrom - 1 && (
         <div class="banner">
@@ -139,7 +142,10 @@ function SlotRow({ trip, s, first, past, onGrip }: { trip: Trip; s: Slot; first:
   const name = s.place?.name ?? (s.kind === 'downtime' ? `Downtime · ${s.end - s.start} min` : 'Lunch (pick a spot nearby)')
   const sub = s.warn ?? (s.place?.booked ?? (s.kind === 'downtime' ? (trip.base ? `At ${trip.base.name}` : 'Rest nearby') : s.place ? `Worth ${s.place.worth}${s.wait && s.wait >= 15 ? ` · ${s.wait} min free before` : ''}` : ''))
   return (
-    <div class={`slot${s.kind !== 'place' ? ' rest' : ''}${s.place?.done ? ' done' : ''}`} data-drag data-left="Off this day" {...sw} style={past ? { opacity: 0.6 } : undefined}>
+    <div class={`slot${s.kind !== 'place' ? ' rest' : ''}${s.place?.done ? ' done' : ''}`} data-drag data-left="Off this day" {...sw} style={past && !s.place?.done ? { opacity: 0.6 } : undefined}>
+      {s.place && !(booked && s.place.kind === 'other')
+        ? <button class={`cross press${s.place.done ? ' on' : ''}`} role="checkbox" aria-checked={!!s.place.done} aria-label={`Done: ${s.place.name}`} onClick={() => setDone(s.id, !s.place!.done)}><span>{s.place.done ? <Icon.check /> : null}</span></button>
+        : <span class="cross none" />}
       <span class="t num">{clock(s.start, true)}</span>
       <button class="open press" disabled={!s.place} onClick={() => s.place && open({ kind: 'card', place: s.id })}>
         <span class="name strong">{name}</span>

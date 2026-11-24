@@ -113,7 +113,7 @@ function Clock24({ label, value, custom, onChange }: { label: string; value: num
     </span>
   )
 }
-const REC = { pay: 'Pay for it', cheaper: 'Do the cheaper version', skip: 'Skip it' }
+const REC = { pay: '', cheaper: 'Save money:', skip: 'Honestly, skip it:' }
 
 export function Card({ trip, id }: { trip: Trip; id: string }) {
   const p = places.use()[id]
@@ -192,7 +192,7 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
       )}
 
       {/* Advice only when it changes something (cheaper version, skip); plain "pay for it" needs no label. */}
-      {!ticket && p.recText && <p>{p.rec !== 'pay' && <b>{REC[p.rec]}. </b>}{cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?|Go for it)[:.,;]?\s*/i, ''))}</p>}
+      {!ticket && p.recText && <p>{p.rec !== 'pay' && <b>{REC[p.rec]} </b>}{cap(p.recText.replace(/^(Pay for it|Do the cheaper version|Skip( it)?|Go for it)[:.,;]?\s*/i, ''))}</p>}
       {p.desc ? <p class="desc">{p.desc}</p> : !p.scoring && !ticket && settings.get().geminiKey ? <p class="muted small">Getting a description…</p> : null}
       {(p.good || p.skipIf) && <GoodSkip p={p} />}
       <Votes p={p} />

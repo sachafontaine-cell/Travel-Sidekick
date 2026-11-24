@@ -24,7 +24,7 @@ import { TripBar } from './tripbar'
 import type { Place, Trip } from '../lib/model'
 
 /** Which chip is on (all, must-sees, or one type) and the search text. Kept while the app is open. */
-const view = createStore<{ chip: Group | 'all' | 'must'; q: string }>({ chip: 'all', q: '' })
+const view = createStore<{ chip: Group | 'all' | 'must' | 'done'; q: string }>({ chip: 'all', q: '' })
 
 /** Best first: must-sees, then by score; done ones last. Other sorts from Sort & filter. */
 function sortList(list: Place[], f: Filters, trip: Trip): Place[] {
@@ -74,7 +74,7 @@ function List({ trip }: { trip: Trip }) {
   const all = tripPlaces(trip.id).filter((p) => !(p.booked && p.kind === 'other'))
   const live = all.filter((p) => p.status !== 'out')
   const q = words(v.q.trim())
-  const match = (p: Place) => (!q || words(p.name).includes(q)) && (v.chip === 'all' || (v.chip === 'must' ? p.must : groupOf(p) === v.chip))
+  const match = (p: Place) => (!q || words(p.name).includes(q)) && (v.chip === 'all' ? true : v.chip === 'done' ? !!p.done : v.chip === 'must' ? p.must : groupOf(p) === v.chip)
   const list = sortList(live.filter(match), f, trip)
   const out = sortList(all.filter((p) => p.status === 'out' && match(p)), { ...f, hideTraps: false }, trip)
   const custom = f.sort !== 'mine' || f.hideTraps === false || !!f.under || f.kids || f.near
@@ -82,12 +82,14 @@ function List({ trip }: { trip: Trip }) {
   const toDecide = queueFor(trip, settings.get().me).length
   const cap = capacity(trip, all)
   const count = (g: Group) => live.filter((p) => groupOf(p) === g).length
-  const chips: [Group | 'all' | 'must', string, string?][] = [
+  const doneN = live.filter((p) => p.done).length
+  const chips: [Group | 'all' | 'must' | 'done', string, string?][] = [
     ['all', `All ${live.length}`],
+    ...(doneN ? [['done', `✓ Done ${doneN}`] as [Group | 'all' | 'must' | 'done', string]] : []),
     ...(live.some((p) => p.must) ? [['must', `★ Must-sees`] as [Group | 'all' | 'must', string]] : []),
     ...GROUP_LIST.filter(([g]) => count(g) > 0).map(([g, name, c]) => [g, `${name} ${count(g)}`, c] as [Group, string, string]),
   ]
-  const chip = (c: Group | 'all' | 'must') => view.set({ ...v, chip: v.chip === c && c !== 'all' ? 'all' : c })
+  const chip = (c: Group | 'all' | 'must' | 'done') => view.set({ ...v, chip: v.chip === c && c !== 'all' ? 'all' : c })
 
   return (
     <>

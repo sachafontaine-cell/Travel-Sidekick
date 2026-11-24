@@ -394,3 +394,4 @@ button.fact:disabled { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .cross.on > span { animation: none; } }
 .facts3.own { grid-template-columns: 1fr; }
 .hiddenchip { border-style: dashed; color: var(--muted); }
+.cardwarn { margin-top: -6px; font-weight: 600; }

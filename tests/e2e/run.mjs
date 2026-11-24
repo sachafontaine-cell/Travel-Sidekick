@@ -192,6 +192,10 @@ await test('sample trip: set your own start time on the Card; Auto gives it back
   await p.getByLabel('Hour').selectOption('15')
   await p.getByLabel('Minutes').selectOption('0')
   await p.getByText('Eiffel Tower at 15:00').waitFor()
+  // Near closing: set 23:00 at a place that closes at 23:45, and the card warns right away.
+  await p.getByLabel('Hour').selectOption('23')
+  await p.getByRole('alert').filter({ hasText: /closes at 23:45|Near closing/i }).waitFor()
+  await p.getByLabel('Hour').selectOption('15')
   await p.getByText('Your time').waitFor()
   await p.keyboard.press('Escape')
   const row = p.locator('.slot', { hasText: 'Eiffel Tower' })

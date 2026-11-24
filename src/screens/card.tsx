@@ -187,6 +187,8 @@ export function Card({ trip, id }: { trip: Trip; id: string }) {
           {<button class={`btn btn-sm press donebtn${p.done ? ' on' : ''}`} aria-pressed={!!p.done} onClick={() => setDone(p.id, !p.done)}><Icon.check />Done</button>}
         </div>
       )}
+      {/* Closed, near closing, too early, or late: right under the day and time you picked. */}
+      {p.status !== 'out' && slot?.warn && <p class="small warn-text cardwarn" role="alert">⚠ {slot.warn}</p>}
       {p.status !== 'out' && day != null && p.fixed != null && (
         <span class="muted small" style={{ marginTop: '-6px' }}>{p.booked ? 'Booked time' : <>Your time · <button class="link small press" onClick={() => setTime(trip, p.id, null)}>let the planner choose</button></>}</span>
       )}

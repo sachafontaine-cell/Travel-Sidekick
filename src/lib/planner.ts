@@ -69,6 +69,24 @@ export function closedDays(p: Place): string[] {
   return p.hours.week.map((h, i) => (h ? '' : WEEKDAY_LONG[i].slice(0, 3))).filter(Boolean)
 }
 
+/**
+ * Opening hours against when you'd be there: closed that day, before opening, after closing,
+ * leaving before you're done, or starting so late that last entry may already be over.
+ */
+export function hoursWarning(p: Place, start: number, date: string): string | undefined {
+  const h = hoursOn(p, date)
+  if (h === null) return `Closed on ${WEEKDAY_LONG[weekday(date)]}s`
+  if (!h) return undefined
+  const [open, close] = h
+  if (close >= 1440) return start < open ? `Opens at ${clock(open)}` : undefined
+  if (start < open) return `Opens at ${clock(open)}`
+  if (start >= close) return `Closed by then (closes ${clock(close)})`
+  const left = close - start
+  if (start + p.minutes > close + 5) return `Closes at ${clock(close)}: only ${left} min there`
+  if (left <= 60 && p.kind !== 'meal' && p.kind !== 'snack') return `Near closing (${clock(close)}): last entry may be earlier`
+  return undefined
+}
+
 export function planDay(trip: Trip, day: number, all: Place[], meta?: DayMeta): DayPlan {
   const date = dateOf(trip, day)
   const list = dayPlaces(all, day)
@@ -107,7 +125,8 @@ export function planDay(trip: Trip, day: number, all: Place[], meta?: DayMeta): 
     const travel = trip_(pos, p)
     const arrive = cursor + travel.minutes
     const start = p.fixed!
-    const warn = arrive > start + 5 ? `About ${arrive - start} min late for the booking` : undefined
+    // A booking's own time is confirmed; a time you set yourself is checked against the hours.
+    const warn = arrive > start + 5 ? `About ${arrive - start} min late for ${p.booked ? 'the booking' : 'your time'}` : p.booked ? undefined : hoursWarning(p, start, date)
     slots.push({ kind: 'place', id: p.id, place: p, start, end: start + p.minutes, travel, warn, wait: Math.max(0, start - arrive) || undefined })
     walkKm += travel.walkKm
     if (!far(p)) pos = p
@@ -154,12 +173,8 @@ export function planDay(trip: Trip, day: number, all: Place[], meta?: DayMeta): 
       if (arrive < LUNCH[0]) start = LUNCH[0]
       else if (arrive > LUNCH[1] - 30 && arrive < DINNER_FROM) start = DINNER_FROM
     }
-    if (h === null) warn = `Closed on ${WEEKDAY_LONG[weekday(date)]}s`
-    else if (h) {
-      if (start < h[0]) start = h[0]
-      if (start >= h[1]) warn = `Closed by then (closes ${clock(h[1])})`
-      else if (start + p.minutes > h[1] + 10) warn = `Closes at ${clock(h[1])}`
-    }
+    if (h && start < h[0]) start = h[0]
+    warn = hoursWarning(p, start, date)
     return { travel, arrive, start, warn }
   }
 

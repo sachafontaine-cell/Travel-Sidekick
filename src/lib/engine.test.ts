@@ -204,7 +204,7 @@ describe('planner never goes back in time (random days)', () => {
       const plan = planDay(t, 2, day)
       for (let i = 1; i < plan.slots.length; i++) {
         const a = plan.slots[i - 1], b = plan.slots[i]
-        const clash = b.place?.fixed != null && b.warn?.includes('late for the booking')
+        const clash = b.place?.fixed != null && !!b.warn?.includes(' min late for ')
         if (b.start < a.start || (b.start < a.end && !clash)) bad.push(`${clock(a.start)}-${clock(a.end)} ${a.id} then ${clock(b.start)} ${b.id}`)
       }
       for (const s of plan.slots) if (s.place?.fixed != null && s.start !== s.place.fixed) bad.push(`booking moved ${s.id}`)
@@ -256,5 +256,26 @@ describe('opening hours from Gemini', () => {
   it('a place saved as closed all week counts as unknown', () => {
     const p = { hours: { week: Array(7).fill(null), source: 'ai' } } as unknown as Place
     expect(hoursOn(p, '2026-11-25')).toBeUndefined()
+  })
+})
+
+describe('warnings about opening hours', () => {
+  it('warns when a time you set is at or near closing, before opening, or past it', async () => {
+    const { hoursWarning } = await import('./planner')
+    const p = { kind: 'museum', minutes: 120, hours: { week: Array(7).fill([9 * 60 + 30, 18 * 60]), source: 'ai' } } as unknown as Place
+    const d = '2026-11-25'
+    expect(hoursWarning(p, 10 * 60, d)).toBeUndefined()
+    expect(hoursWarning(p, 8 * 60, d)).toBe('Opens at 9:30')
+    expect(hoursWarning(p, 17 * 60, d)).toBe('Closes at 18:00: only 60 min there')
+    expect(hoursWarning({ ...p, minutes: 45 } as Place, 17 * 60 + 15, d)).toBe('Near closing (18:00): last entry may be earlier')
+    expect(hoursWarning(p, 18 * 60, d)).toBe('Closed by then (closes 18:00)')
+  })
+  it('a time you set gets checked; a booking keeps its confirmed time', () => {
+    const { trip, places } = demoTrip()
+    const base = { ...places[0], day: 4, dayRank: 'a', hours: { week: Array(7).fill([9 * 60 + 30, 18 * 60]), source: 'ai' as const }, minutes: 90, kind: 'museum' as const }
+    const mine = planDay(trip, 4, [{ ...base, id: 'm', fixed: 17 * 60 + 30, booked: undefined }]).slots.find((s) => s.id === 'm')!
+    expect(mine.warn).toBe('Closes at 18:00: only 30 min there')
+    const booked = planDay(trip, 4, [{ ...base, id: 'b', fixed: 17 * 60 + 30, booked: 'Booked' }]).slots.find((s) => s.id === 'b')!
+    expect(booked.warn).toBeUndefined()
   })
 })

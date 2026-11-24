@@ -38,17 +38,17 @@ const storedPlaces = async (p) => { await p.waitForTimeout(700); return p.evalua
 
 // ---------- Sample trip ----------
 
-await test('sample trip: Today shows next up, leave-by, what now, and asks about the Louvre', async () => {
+await test('sample trip: Days opens on today: Now card with next up, leave-by, free-time idea, done?', async () => {
   const p = await page()
   await p.goto(BASE + '?demo')
   await p.getByText('Next up').waitFor()
   const t = await text(p)
   expect(t.includes('Lunch · Le Fumoir'), 'next up is lunch')
   expect(/Leave by \d/.test(t), 'leave-by shown')
-  expect(t.includes('What now?') && t.includes('Tuileries Garden'), 'what now suggests the Tuileries')
+  expect(t.includes('Free time?') && t.includes('Tuileries Garden'), 'free time suggests the Tuileries')
   expect(t.includes('Louvre (highlights tour): done?'), 'asks if the Louvre is done')
   await p.getByRole('button', { name: 'Yes' }).click()
-  await p.getByText('Must-sees 5 of 9').waitFor()
+  await p.getByText(/5 of 9 done/).waitFor()
   // Every trip screen has a way back to all trips, and to ⚙.
   await p.getByRole('button', { name: 'This app: key, family link, alerts' }).click()
   await p.getByRole('dialog', { name: 'This app' }).waitFor()
@@ -256,7 +256,7 @@ await test('sample trip: Map: filter first, then pins; a pin opens a summary and
 
 await test('sample trip: Day view drag moves downtime; Back closes overlays first', async () => {
   const p = await page()
-  await p.goto(BASE + '?demo#/t/demo-paris/plan/3')
+  await p.goto(BASE + '?demo#/t/demo-paris/plan/4')
   const kinds = () => p.locator('.slot .name').allInnerTexts()
   const before = await kinds()
   const di = before.findIndex((x) => x.startsWith('Downtime'))
@@ -266,11 +266,11 @@ await test('sample trip: Day view drag moves downtime; Back closes overlays firs
   await p.mouse.up(); await p.waitForTimeout(200)
   const after = await kinds()
   expect(after.findIndex((x) => x.startsWith('Downtime')) === di + 1, `downtime moved one later (${after})`)
-  await p.locator('.slot .open', { hasText: 'Sainte-Chapelle' }).click()
+  await p.locator('.slot .open', { hasText: 'Jardin' }).click()
   await p.getByRole('dialog').waitFor()
   await p.goBack()
   await p.getByRole('dialog').waitFor({ state: 'detached' })
-  expect(p.url().includes('plan/3'), 'still on Day 3 after Back')
+  expect(p.url().includes('plan/4'), 'still on Day 4 after Back')
   await p.context().close()
 })
 
@@ -437,8 +437,8 @@ await test('new trip: setup, key, build the list (streamed), confirm must-sees, 
   await p.screenshot({ path: `${SHOTS}/new-trip-plan.png` })
   // Reopening the app goes straight back into this trip; Trips is one tap away.
   await p.goto(BASE)
-  await p.waitForFunction(() => location.hash.includes('/today'))
-  expect((await p.evaluate(() => location.hash)).includes('/today'), 'reopens on the last trip')
+  await p.waitForFunction(() => location.hash.includes('/plan'))
+  expect((await p.evaluate(() => location.hash)).includes('/plan'), 'reopens on the last trip')
   await p.context().close()
 })
 
@@ -473,7 +473,7 @@ await test('speed: first screen < 1 s and screens switch < 150 ms (CPU 4× slowe
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)))
     return performance.now() - t0
   }, name)
-  const times = { ideas: await tap('Ideas'), days: await tap('Days'), today: await tap('Today'), ideas2: await tap('Ideas') }
+  const times = { ideas: await tap('Ideas'), trip: await tap('Trip'), days: await tap('Days'), ideas2: await tap('Ideas') }
   console.log(`   first paint ${Math.round(first)} ms; tab switches ${Object.values(times).map((x) => Math.round(x)).join(', ')} ms`)
   expect(first < 1000, `first paint ${Math.round(first)} ms`)
   expect(Math.max(...Object.values(times)) < 150, `tab switch ${JSON.stringify(times)}`)

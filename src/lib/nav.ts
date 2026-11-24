@@ -4,7 +4,7 @@ import { createStore } from './store'
 
 export type Route =
   | { name: 'trips' }
-  | { name: 'today' | 'trip' | 'setup' | 'start'; trip: string }
+  | { name: 'trip' | 'setup' | 'start'; trip: string }
   | { name: 'plan'; trip: string; day: number }
   | { name: 'ideas'; trip: string; map: boolean }
 
@@ -12,10 +12,11 @@ export function parse(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean)
   if (parts[0] === 't' && parts[1]) {
     const trip = decodeURIComponent(parts[1])
-    const name = parts[2] ?? 'today'
+    // Today is part of Days now (old links still work).
+    const name = parts[2] === 'today' || !parts[2] ? 'plan' : parts[2]
     if (name === 'plan') return parts[3] === 'map' ? { name: 'ideas', trip, map: true } : { name: 'plan', trip, day: Number(parts[3]) || 0 }
     if (name === 'ideas') return { name: 'ideas', trip, map: parts[3] === 'map' }
-    if (name === 'today' || name === 'trip' || name === 'setup' || name === 'start') return { name, trip }
+    if (name === 'trip' || name === 'setup' || name === 'start') return { name, trip }
   }
   return { name: 'trips' }
 }
@@ -31,7 +32,7 @@ export function go(hash: string, replace = false) {
   if (replace) { history.replaceState(null, '', hash); route.set(parse(hash)) }
   else location.hash = hash
 }
-export const tripPath = (id: string, rest = 'today') => `#/t/${encodeURIComponent(id)}/${rest}`
+export const tripPath = (id: string, rest = 'plan') => `#/t/${encodeURIComponent(id)}/${rest}`
 
 // ---- Overlays
 export type Overlay =

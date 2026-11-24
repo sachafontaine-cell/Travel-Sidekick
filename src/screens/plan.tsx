@@ -13,6 +13,7 @@ import { legTextOf } from '../lib/geo'
 import { realLegs } from '../lib/legs'
 import { fitWanted, pendingFor, unfitIds } from './ideas'
 import { TripBar } from './tripbar'
+import { BeforeTrip, Now, Weather } from './today'
 import type { Trip } from '../lib/model'
 
 export function Plan({ trip, day }: { trip: Trip; day: number }) {
@@ -24,9 +25,15 @@ export function Plan({ trip, day }: { trip: Trip; day: number }) {
   return (
     <main class="main">
       <TripBar />
-      <h1 class="h1">Days</h1>
+      <div class="titlerow">
+        <h1 class="h1">Days</h1>
+        <button class="pill press" onClick={() => open({ kind: 'ask' })}><Icon.chat />Ask</button>
+      </div>
+      {now.day < 1 && <BeforeTrip trip={trip} />}
+      {now.day > n && <p class="muted">Trip over. Welcome home!</p>}
       <DateStrip trip={trip} sel={sel} />
       <Alert trip={trip} />
+      {sel === now.day && <Now trip={trip} />}
       <Day trip={trip} day={sel} />
     </main>
   )
@@ -101,7 +108,7 @@ function Day({ trip, day }: { trip: Trip; day: number }) {
   }
   return (
     <>
-      <div class="between"><span class="h3">{WEEKDAY_LONG[weekday(date)]} {Number(date.slice(8))} {MONTHS[Number(date.slice(5, 7)) - 1]}</span><span class="muted small">Day {day} · walking {plan.walkMi} of {plan.limitMi} mi</span></div>
+      <div class="between"><span class="h3">{WEEKDAY_LONG[weekday(date)]} {Number(date.slice(8))} {MONTHS[Number(date.slice(5, 7)) - 1]}</span><span class="stack" style={{ gap: '1px', alignItems: 'flex-end' }}><Weather trip={trip} date={date} /><span class="muted small">Day {day} · walking {plan.walkMi} of {plan.limitMi} mi</span></span></div>
       {near && <div class="bar" aria-hidden="true"><span style={{ width: `${Math.min(100, (plan.walkMi / plan.limitMi) * 100)}%`, background: plan.over ? 'var(--danger)' : undefined }} /></div>}
       {plan.issues.length > 0 && day >= fixFrom - 1 && (
         <div class="banner">

@@ -57,46 +57,37 @@ function MustLine({ trip, today, now }: { trip: Trip; today: number; now: number
   )
 }
 
-export function Today({ trip }: { trip: Trip }) {
-  places.use(); trips.use(); realLegs.use()
-  const s = settings.use()
+/** Weather for a date, small: "24°C · rain at 16:00". */
+export function Weather({ trip, date }: { trip: Trip; date: string }) {
   const wx = weather.use()[trip.id]
-  const now = nowIn(trip)
-  const n = tripDays(trip)
-  const [pick, setPick] = useState(0)
+  if (!wx || !wx.c || wx.date !== date) return null
+  return <span class="muted small">{wx.temp}°C{wx.rainAt != null ? ` · rain at ${wx.rainAt}:00` : ''}</span>
+}
 
-  const header = (title: string, eyebrow: string) => (
-    <div class="between" style={{ alignItems: 'flex-end' }}>
-      <div><p class="eyebrow">{eyebrow}</p><h1 class="h1">{title}</h1></div>
-      {wx && wx.c && wx.date === now.date && <span class="strong" style={{ textAlign: 'right' }}>{wx.temp}°C{wx.rainAt != null && <><br /><span class="muted small">rain at {wx.rainAt}:00</span></>}</span>}
+/** Before the trip, at the top of Days: the countdown and what to download. */
+export function BeforeTrip({ trip }: { trip: Trip }) {
+  const now = nowIn(trip)
+  const inDays = daysBetween(now.date, trip.start)
+  return (
+    <div class="stack">
+      <p class="h3">{trip.name} in {inDays} day{inDays === 1 ? '' : 's'}</p>
+      <BeforeYouGo trip={trip} />
     </div>
   )
+}
 
-  if (now.day < 1) {
-    const inDays = daysBetween(now.date, trip.start)
-    return (
-      <main class="main">
-        <TripBar />
-        {header(`${trip.name} in ${inDays} day${inDays === 1 ? '' : 's'}`, shortDate(trip.start))}
-        <MustLine trip={trip} today={0} now={now.min} />
-        <BeforeYouGo trip={trip} />
-        <button class="btn btn-secondary press" onClick={() => go(tripPath(trip.id, 'plan/1'), true)}>Walk through Day 1</button>
-      </main>
-    )
-  }
-  if (now.day > n) {
-    return (
-      <main class="main">
-        <TripBar />
-        {header('Trip over', trip.name)}
-        <p class="muted">Welcome home.</p>
-        <button class="btn btn-secondary press" onClick={() => go('#/', true)}>All trips</button>
-      </main>
-    )
-  }
-
+/**
+ * Right now, at the top of today in Days: "done?" for what just ended, what's next and when to
+ * leave (with directions), and an idea when there's free time.
+ */
+export function Now({ trip }: { trip: Trip }) {
+  places.use(); trips.use(); realLegs.use()
+  const s = settings.use()
+  const now = nowIn(trip)
+  const [pick, setPick] = useState(0)
   const plan = plansFor(trip)[now.day - 1]
-  const slots = plan?.slots ?? []
+  if (!plan) return null
+  const slots = plan.slots
   // "Done?" is for things you choose to do, plus booked must-sees (they count). Flights just happen.
   const asked = slots.filter((x) => x.place && (!x.place.booked || x.place.must) && x.end <= now.min && !x.place.done && x.place.status !== 'out')
   const next = slots.find((x) => x.end > now.min)
@@ -104,14 +95,11 @@ export function Today({ trip }: { trip: Trip }) {
   const gap = gapNow(trip, plan, now.min)
   const list = gap.minutes >= 30 ? ideas(trip, tripPlaces(trip.id), now.date, now.min, gap, energy) : []
   const idea = list.length ? list[pick % list.length] : undefined
-  const later = slots.filter((x) => x.start > now.min && x !== next).slice(0, 3)
   const leaveBy = next && next.start > now.min && next.travel.minutes > 0 ? next.start - next.travel.minutes - kidBuffer(trip) : null
+  const dir = next?.place ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${next.place.name}, ${trip.dest.name}`)}&travelmode=${next.travel.mode === 'car' ? 'driving' : next.travel.mode === 'transit' ? 'transit' : 'walking'}` : null
 
   return (
-    <main class="main">
-      <TripBar />
-      {header('Today', `${trip.name} · Day ${now.day} of ${n}`)}
-
+    <>
       {asked.slice(-1).map((x) => (
         <div class="banner">
           <span class="grow"><b>{x.place!.name}</b>: done?</span>
@@ -120,21 +108,28 @@ export function Today({ trip }: { trip: Trip }) {
         </div>
       ))}
 
-      {next ? (
-        <button class="card hero press" style={{ textAlign: 'left' }} onClick={() => next.place ? open({ kind: 'card', place: next.id }) : go(tripPath(trip.id, `plan/${now.day}`), true)}>
-          <span class="label">{next.start <= now.min ? 'Now' : 'Next up'} · {clock(next.start)}</span>
-          <span class="h2">{next.place?.name ?? (next.kind === 'downtime' ? 'Downtime' : 'Lunch')}</span>
+      {next && (
+        <div class="card hero nowcard">
+          <button class="stack press" style={{ gap: '4px', textAlign: 'left' }} onClick={() => next.place && open({ kind: 'card', place: next.id })}>
+            <span class="label">{next.start <= now.min ? 'Now' : 'Next up'} · {clock(next.start)}</span>
+            <span class="h2">{next.place?.name ?? (next.kind === 'downtime' ? 'Downtime' : 'Lunch')}</span>
+          </button>
           {leaveBy != null && (
-            <span class="leave"><b>Leave by {clock(leaveBy)}</b><span class="muted small">{legTextOf(next.travel)} + {kidBuffer(trip)} min kid buffer</span></span>
+            <div class="leave">
+              <span class="grow stack" style={{ gap: '2px' }}><b>Leave by {clock(leaveBy)}</b><span class="muted small">{legTextOf(next.travel)} + {kidBuffer(trip)} min kid buffer</span></span>
+              {dir && <a class="btn btn-primary btn-sm press" href={dir} target="_blank" rel="noopener"><Icon.pin />Go</a>}
+            </div>
           )}
-        </button>
-      ) : (
-        <div class="card card-pad"><p>Nothing else planned today.</p></div>
+        </div>
       )}
 
       {list.length > 0 && idea && (
         <div class="card hero">
-          <div class="between"><span class="h2">What now?</span><span class="muted small">{duration(gap.minutes)} free</span></div>
+          <div class="between"><span class="h3">Free time? {duration(gap.minutes)}</span>
+            <div class="energy mini" role="group" aria-label="Energy">
+              {(['tired', 'ok', 'fresh'] as Energy[]).map((e) => <button class={`press${energy === e ? ' on' : ''}`} aria-pressed={energy === e} aria-label={e === 'tired' ? 'Tired' : e === 'ok' ? 'OK' : 'Fresh'} onClick={() => { settings.set({ ...settings.get(), energy: { date: now.date, level: e } }); setPick(0) }}>{e === 'tired' ? '😴' : e === 'ok' ? '🙂' : '⚡'}</button>)}
+            </div>
+          </div>
           <button class="idea press row" style={{ alignItems: 'flex-start' }} onClick={() => open({ kind: 'card', place: idea.place.id })}>
             <Photos p={idea.place} size="thumb" />
             <span class="grow stack" style={{ gap: '4px' }}>
@@ -146,31 +141,8 @@ export function Today({ trip }: { trip: Trip }) {
             <button class="btn btn-primary btn-sm grow press" onClick={() => { addNow(trip, idea.place.id, now.day, now.min, slots); setPick(0) }}>Go now</button>
             {list.length > 1 && <button class="btn btn-quiet btn-sm grow press" onClick={() => setPick(pick + 1)}>Another idea</button>}
           </div>
-          <div class="stack" style={{ gap: '4px' }}>
-            <span class="muted small">Energy</span>
-            <div class="energy" role="group" aria-label="Energy">
-              {(['tired', 'ok', 'fresh'] as Energy[]).map((e) => <button class={`pill press${energy === e ? ' on' : ''}`} aria-pressed={energy === e} onClick={() => { settings.set({ ...settings.get(), energy: { date: now.date, level: e } }); setPick(0) }}>{e === 'tired' ? 'Tired' : e === 'ok' ? 'OK' : 'Fresh'}</button>)}
-            </div>
-          </div>
         </div>
       )}
-
-      <MustLine trip={trip} today={now.day} now={now.min} />
-
-      {later.length > 0 && (
-        <div class="stack">
-          <span class="label">Later today</span>
-          <div class="list">
-            {later.map((x) => (
-              <button class="kv press" onClick={() => (x.place ? open({ kind: 'card', place: x.id }) : go(tripPath(trip.id, `plan/${now.day}`), true))}>
-                <span class="row"><span class="strong num" style={{ width: '64px' }}>{clock(x.start, true)}</span><span>{x.place?.name ?? (x.kind === 'downtime' ? 'Downtime' : 'Lunch')}</span></span>
-                <Icon.chev />
-              </button>
-            ))}
-          </div>
-          <button class="link press" style={{ alignSelf: 'center' }} onClick={() => go(tripPath(trip.id, `plan/${now.day}`), true)}>See the whole day</button>
-        </div>
-      )}
-    </main>
+    </>
   )
 }

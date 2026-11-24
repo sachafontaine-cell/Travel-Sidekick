@@ -72,12 +72,15 @@ function List({ trip }: { trip: Trip }) {
   useEffect(() => { void locate() }, [])
   const [showOut, setShowOut] = useState(false)
   const all = tripPlaces(trip.id).filter((p) => !(p.booked && p.kind === 'other'))
-  const live = all.filter((p) => p.status !== 'out')
+  // Hide food (Sort & filter): out of the list, the counts and the chips, until you show it again.
+  const live = all.filter((p) => p.status !== 'out' && !(f.hideFood && groupOf(p) === 'food'))
   const q = words(v.q.trim())
   const match = (p: Place) => (!q || words(p.name).includes(q)) && (v.chip === 'all' ? true : v.chip === 'done' ? !!p.done : v.chip === 'must' ? p.must : groupOf(p) === v.chip)
   const list = sortList(live.filter(match), f, trip)
-  const out = sortList(all.filter((p) => p.status === 'out' && match(p)), { ...f, hideTraps: false }, trip)
-  const custom = f.sort !== 'mine' || f.hideTraps === false || !!f.under || f.kids || f.near
+  const out = sortList(all.filter((p) => p.status === 'out' && match(p) && !(f.hideFood && groupOf(p) === 'food')), { ...f, hideTraps: false }, trip)
+  const custom = f.sort !== 'mine' || f.hideTraps === false || !!f.under || f.kids || f.near || !!f.hideFood
+  // A hidden type can't stay the chosen chip.
+  useEffect(() => { if (f.hideFood && v.chip === 'food') view.set({ ...v, chip: 'all' }) }, [f.hideFood])
   const wanted = live.filter((p) => p.status === 'picked').length
   const toDecide = queueFor(trip, settings.get().me).length
   const cap = capacity(trip, all)
@@ -100,6 +103,7 @@ function List({ trip }: { trip: Trip }) {
       </div>
       <div class="strip chipstrip" role="group" aria-label="Show">
         {chips.map(([c, label, color]) => <button class={`pill press${v.chip === c ? ' on' : ''}`} aria-pressed={v.chip === c} onClick={() => chip(c)}>{color && <span class="dot" style={{ background: color }} />}{label}</button>)}
+        {f.hideFood && <button class="pill press hiddenchip" onClick={() => filters.set({ ...f, hideFood: false })}>Food hidden · show</button>}
       </div>
 
       {toDecide > 0 && !q && (

@@ -18,7 +18,7 @@ import { clock, duration, shortDate, WEEKDAY, weekday } from '../lib/time'
 import { symbol } from '../lib/money'
 import type { Place, Trip } from '../lib/model'
 
-export interface Filters { sort: 'mine' | 'worth' | 'value' | 'price' | 'distance' | 'must'; hideTraps: boolean; under?: number; kids: boolean; near: boolean; group?: boolean }
+export interface Filters { sort: 'mine' | 'worth' | 'value' | 'price' | 'distance' | 'must'; hideTraps: boolean; under?: number; kids: boolean; near: boolean; group?: boolean; hideFood?: boolean }
 export const filters = createStore<Filters>({ sort: 'mine', hideTraps: true, kids: false, near: false }, 'filters')
 
 export function FilterSheet({ trip }: { trip: Trip }) {
@@ -32,6 +32,7 @@ export function FilterSheet({ trip }: { trip: Trip }) {
 </div>
       <div class="stack"><span class="label">Show</span>
         <div class="chips">
+          <button class={`pill press${f.hideFood ? ' on' : ''}`} aria-pressed={!!f.hideFood} onClick={() => set({ hideFood: !f.hideFood })}>Hide food</button>
           <button class={`pill press${f.hideTraps ? ' on' : ''}`} aria-pressed={f.hideTraps} onClick={() => set({ hideTraps: !f.hideTraps })}>Hide traps</button>
           {[20, 30, 50].map((n) => <button class={`pill press${f.under === n ? ' on' : ''}`} aria-pressed={f.under === n} onClick={() => set({ under: f.under === n ? undefined : n })}>Under {cur}{n}</button>)}
           <button class={`pill press${f.near ? ' on' : ''}`} aria-pressed={f.near} onClick={() => set({ near: !f.near })}>Near the hotel</button>
